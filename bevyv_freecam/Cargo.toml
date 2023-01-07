@@ -1,0 +1,7 @@
+[package]
+name = "bevyv_freecam"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+bevy = { version = "0.9", default-features = false, features = ["bevy_render"] }
