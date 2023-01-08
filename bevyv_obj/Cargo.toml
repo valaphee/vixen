@@ -1,0 +1,9 @@
+[package]
+name = "bevyv_obj"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+bevy = { version = "0.9", default-features = false, features = ["bevy_asset", "bevy_render"] }
+thiserror = "1.0"

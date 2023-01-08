@@ -6,5 +6,6 @@ edition = "2021"
 [workspace]
 members = [
     "bevyv_freecam",
-    "bevyv_mcbe"
+    "bevyv_mcbe",
+    "bevyv_obj"
 ]
