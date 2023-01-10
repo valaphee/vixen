@@ -90,15 +90,13 @@ async fn load_obj<'a, 'b>(
                 return Err(ObjError::WrongNumberOfArguments);
             }
 
-            {
-                let v = vs.get((v_index - 1) as usize).ok_or(ObjError::IndexOutOfRange(v_index))?;
-                if v.len() < 3 {
-                    return Err(ObjError::WrongNumberOfArguments);
-                }
-                positions.push([v[0], v[1], v[2]]);
-                if v.len() >= 6 {
-                    colors.push([v[4], v[5], v[6]]);
-                }
+            let v = vs.get((v_index - 1) as usize).ok_or(ObjError::IndexOutOfRange(v_index))?;
+            if v.len() < 3 {
+                return Err(ObjError::WrongNumberOfArguments);
+            }
+            positions.push([v[0], v[1], v[2]]);
+            if v.len() >= 6 {
+                colors.push([v[4], v[5], v[6]]);
             }
 
             let vt_index = e.get(1).unwrap_or(&0).to_owned();
