@@ -1,9 +1,9 @@
-use std::io::BufRead;
 use bevy::{
     asset::{AssetLoader, BoxedFuture, LoadContext, LoadedAsset},
     prelude::*,
-    render::mesh::PrimitiveTopology
+    render::mesh::PrimitiveTopology,
 };
+use std::io::BufRead;
 use thiserror::Error;
 
 #[derive(Default)]
@@ -19,10 +19,12 @@ impl Plugin for ObjPlugin {
 struct ObjLoader;
 
 impl AssetLoader for ObjLoader {
-    fn load<'a>(&'a self, bytes: &'a [u8], load_context: &'a mut LoadContext) -> BoxedFuture<'a, anyhow::Result<()>> {
-        Box::pin(async move {
-            Ok(load_obj(bytes, load_context).await?)
-        })
+    fn load<'a>(
+        &'a self,
+        bytes: &'a [u8],
+        load_context: &'a mut LoadContext,
+    ) -> BoxedFuture<'a, anyhow::Result<()>> {
+        Box::pin(async move { Ok(load_obj(bytes, load_context).await?) })
     }
 
     fn extensions(&self) -> &[&str] {
@@ -69,11 +71,23 @@ async fn load_obj<'a, 'b>(
                     vns.push(line_iter.map(|elem| elem.parse().unwrap()).collect());
                 }
                 "f" => {
-                    fs.push(line_iter.map(|face| face.split('/').map(|elem| if elem.is_empty() { 0 } else { elem.parse().unwrap() }).collect()).collect());
+                    fs.push(
+                        line_iter
+                            .map(|face| {
+                                face.split('/')
+                                    .map(|elem| {
+                                        if elem.is_empty() {
+                                            0
+                                        } else {
+                                            elem.parse().unwrap()
+                                        }
+                                    })
+                                    .collect()
+                            })
+                            .collect(),
+                    );
                 }
-                _ => {
-                    /*return Err(ObjError::UnknownStatement(stmt.to_string()));*/
-                }
+                _ => { /*return Err(ObjError::UnknownStatement(stmt.to_string()));*/ }
             }
         }
     }
@@ -90,7 +104,9 @@ async fn load_obj<'a, 'b>(
                 return Err(ObjError::WrongNumberOfArguments);
             }
 
-            let v = vs.get((v_index - 1) as usize).ok_or(ObjError::IndexOutOfRange(v_index))?;
+            let v = vs
+                .get((v_index - 1) as usize)
+                .ok_or(ObjError::IndexOutOfRange(v_index))?;
             if v.len() < 3 {
                 return Err(ObjError::WrongNumberOfArguments);
             }
@@ -101,7 +117,9 @@ async fn load_obj<'a, 'b>(
 
             let vt_index = e.get(1).unwrap_or(&0).to_owned();
             if vt_index != 0 {
-                let vt = vts.get((vt_index - 1) as usize).ok_or(ObjError::IndexOutOfRange(vt_index))?;
+                let vt = vts
+                    .get((vt_index - 1) as usize)
+                    .ok_or(ObjError::IndexOutOfRange(vt_index))?;
                 if vt.len() < 1 {
                     return Err(ObjError::WrongNumberOfArguments);
                 }
@@ -110,7 +128,9 @@ async fn load_obj<'a, 'b>(
 
             let vn_index = e.get(2).unwrap_or(&0).to_owned();
             if vn_index != 0 {
-                let vn = vns.get((vn_index - 1) as usize).ok_or(ObjError::IndexOutOfRange(vn_index))?;
+                let vn = vns
+                    .get((vn_index - 1) as usize)
+                    .ok_or(ObjError::IndexOutOfRange(vn_index))?;
                 if vn.len() < 3 {
                     return Err(ObjError::WrongNumberOfArguments);
                 }

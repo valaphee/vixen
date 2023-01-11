@@ -1,12 +1,16 @@
 [package]
-name = "bevyv_obj"
+name = "bevyv_vfs"
 version = "0.0.1"
 edition = "2021"
 
 [dependencies]
 anyhow = "1.0"
-bevy = { version = "0.9", default-features = false, features = ["bevy_asset", "bevy_render"] }
-thiserror = "1.0"
+bevy = { version = "0.9", default-features = false, features = ["bevy_asset"] }
+futures-lite = "1.12"
+hex = { version = "0.4", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha1 = "0.10"
 
 [dev-dependencies]
 bevy = { version = "0.9", default-features = false, features = [
@@ -23,3 +27,4 @@ bevy = { version = "0.9", default-features = false, features = [
     "wayland",
     "x11"
 ] }
+bevyv_obj = { path = "../bevyv_obj" }
