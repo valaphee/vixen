@@ -2,6 +2,7 @@
 name = "bevyv_obj"
 version = "0.0.1"
 edition = "2021"
+description = "Wavefront OBJ support for Bevy."
 
 [dependencies]
 anyhow = "1.0"

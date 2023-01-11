@@ -2,6 +2,7 @@
 name = "bevyv_vfs"
 version = "0.0.1"
 edition = "2021"
+description = "File-based content-addressed storage for Bevy."
 
 [dependencies]
 anyhow = "1.0"

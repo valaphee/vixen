@@ -4,7 +4,4 @@ version = "0.0.0"
 edition = "2021"
 
 [workspace]
-members = [
-    "bevyv_obj",
-    "bevyv_vfs"
-]
+members = ["crates/*"]
