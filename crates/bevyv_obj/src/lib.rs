@@ -15,8 +15,9 @@ impl Plugin for ObjPlugin {
     }
 }
 
+/// Wavefront OBJ asset loader.
 #[derive(Default)]
-struct ObjLoader;
+pub struct ObjLoader;
 
 impl AssetLoader for ObjLoader {
     fn load<'a>(
@@ -42,6 +43,7 @@ enum ObjError {
     UnsupportedStatement(String),
 }
 
+// See http://paulbourke.net/dataformats/obj/
 async fn load_obj<'a, 'b>(
     bytes: &'a [u8],
     load_context: &'a mut LoadContext<'b>,
@@ -127,38 +129,54 @@ async fn load_obj<'a, 'b>(
                             } else {
                                 index.to_owned()
                             };
-                            positions.push(*vertices.get((absolute_index - 1) as usize).ok_or(ObjError::IndexOutOfRange(index))?);
+                            positions.push(
+                                *vertices
+                                    .get((absolute_index - 1) as usize)
+                                    .ok_or(ObjError::IndexOutOfRange(index))?,
+                            );
                         } else {
                             return Err(ObjError::WrongNumberOfArguments);
                         }
 
                         // Vertex Texture
-                        if let Some(index_str) = indices.next().filter(|index_str| !index_str.is_empty()) {
+                        if let Some(index_str) =
+                            indices.next().filter(|index_str| !index_str.is_empty())
+                        {
                             let index: i32 = index_str.parse().unwrap();
                             let absolute_index = if index.is_negative() {
                                 (vertices.len() as i32) - index
                             } else {
                                 index.to_owned()
                             };
-                            uvs.push(*vertices_texture.get((absolute_index - 1) as usize).ok_or(ObjError::IndexOutOfRange(index))?);
+                            uvs.push(
+                                *vertices_texture
+                                    .get((absolute_index - 1) as usize)
+                                    .ok_or(ObjError::IndexOutOfRange(index))?,
+                            );
                         }
 
                         // Vertex Normal
-                        if let Some(index_str) = indices.next().filter(|index_str| !index_str.is_empty()) {
+                        if let Some(index_str) =
+                            indices.next().filter(|index_str| !index_str.is_empty())
+                        {
                             let index: i32 = index_str.parse().unwrap();
                             let absolute_index = if index.is_negative() {
                                 (vertices.len() as i32) - index
                             } else {
                                 index.to_owned()
                             };
-                            normals.push(*vertices_normal.get((absolute_index - 1) as usize).ok_or(ObjError::IndexOutOfRange(index))?);
+                            normals.push(
+                                *vertices_normal
+                                    .get((absolute_index - 1) as usize)
+                                    .ok_or(ObjError::IndexOutOfRange(index))?,
+                            );
                         }
 
                         element_count += 1;
                     }
 
                     if element_count != 3 {
-                        return Err(ObjError::UnsupportedStatement(line))
+                        return Err(ObjError::UnsupportedStatement(line));
                     }
                 }
                 _ => { /*return Err(ObjError::UnknownStatement(stmt.to_string()));*/ }

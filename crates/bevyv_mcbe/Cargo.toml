@@ -1,0 +1,27 @@
+[package]
+name = "bevyv_mcbe"
+version = "0.0.0"
+edition = "2021"
+description = "Minecraft assets support for Bevy."
+
+[dependencies]
+anyhow = "1.0"
+bevy = { version = "0.9", default-features = false, features = ["bevy_asset", "bevy_render"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", git = "https://github.com/valaphee/serde_json.git" }
+
+[dev-dependencies]
+bevy = { version = "0.9", default-features = false, features = [
+    "animation",
+    "bevy_asset",
+    "bevy_core_pipeline",
+    "bevy_gilrs",
+    "bevy_pbr",
+    "bevy_render",
+    "bevy_scene",
+    "bevy_winit",
+    "png",
+    "jpeg",
+    "wayland",
+    "x11"
+] }

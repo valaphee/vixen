@@ -1,6 +1,7 @@
 use anyhow::Result;
 use bevy::{
-    asset::{AssetIo, AssetIoError, AssetPlugin, BoxedFuture, Metadata},
+    asset::{AssetIo, AssetIoError, BoxedFuture, Metadata},
+    prelude::*,
     utils::HashMap,
 };
 use futures_lite::future;
@@ -8,12 +9,10 @@ use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 use std::path::{Path, PathBuf};
 
-/// File-based content addressed storage.
+/// File-based content addressed storage asset io.
 ///
-/// This file based cas uses an index for associating file paths with their corresponding hashes
-/// which is also used as their filename.
-/// It also ensures file integrity, and can make updating assets easier and more efficient, and eliminates
-/// file duplicates.
+/// Uses an index for associating file paths with their corresponding hashes, which makes updating
+/// assets easier, allows version selection, without updating assets, and eliminates file duplicates.
 pub struct CasAssetIo {
     parent: Box<dyn AssetIo>,
     index: HashMap<String, Hash>,
