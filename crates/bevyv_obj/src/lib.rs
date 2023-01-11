@@ -37,18 +37,18 @@ enum ObjError {
     #[error("wrong number of arguments")]
     WrongNumberOfArguments,
     #[error("index out of range")]
-    IndexOutOfRange(u32),
-    #[error("unknown statement: {0}")]
-    UnknownStatement(String),
+    IndexOutOfRange(i32),
+    #[error("unsupported statement: {0}")]
+    UnsupportedStatement(String),
 }
 
 async fn load_obj<'a, 'b>(
     bytes: &'a [u8],
     load_context: &'a mut LoadContext<'b>,
 ) -> Result<(), ObjError> {
-    let mut vs: Vec<[f32; 3]> = Vec::new();
-    let mut vts: Vec<[f32; 2]> = Vec::new();
-    let mut vns: Vec<[f32; 3]> = Vec::new();
+    let mut vertices: Vec<[f32; 3]> = Vec::new();
+    let mut vertices_texture: Vec<[f32; 2]> = Vec::new();
+    let mut vertices_normal: Vec<[f32; 3]> = Vec::new();
 
     let mut positions: Vec<[f32; 3]> = Vec::new();
     let mut normals: Vec<[f32; 3]> = Vec::new();
@@ -60,10 +60,10 @@ async fn load_obj<'a, 'b>(
         }
 
         let mut line_iter = line.split_whitespace();
-        if let Some(stmt) = line_iter.next() {
-            match stmt {
+        if let Some(statement) = line_iter.next() {
+            match statement {
                 "v" => {
-                    vs.push([
+                    vertices.push([
                         line_iter
                             .next()
                             .ok_or(ObjError::WrongNumberOfArguments)?
@@ -82,7 +82,7 @@ async fn load_obj<'a, 'b>(
                     ]);
                 }
                 "vt" => {
-                    vts.push([
+                    vertices_texture.push([
                         line_iter
                             .next()
                             .ok_or(ObjError::WrongNumberOfArguments)?
@@ -95,7 +95,7 @@ async fn load_obj<'a, 'b>(
                     ]);
                 }
                 "vn" => {
-                    vns.push([
+                    vertices_normal.push([
                         line_iter
                             .next()
                             .ok_or(ObjError::WrongNumberOfArguments)?
@@ -114,52 +114,51 @@ async fn load_obj<'a, 'b>(
                     ]);
                 }
                 "f" => {
-                    for f in line_iter {
-                        let e: Vec<i32> = f
-                            .split('/')
-                            .map(|elem| {
-                                if elem.is_empty() {
-                                    0
-                                } else {
-                                    elem.parse().unwrap()
-                                }
-                            })
-                            .collect();
+                    let mut element_count = 0;
 
-                        let v_index = to_absolute_index(e.get(0), vs.len() as u32);
-                        if v_index == 0 {
+                    for element in line_iter {
+                        let mut indices = element.split('/');
+
+                        // Vertex
+                        if let Some(index_str) = indices.next() {
+                            let index: i32 = index_str.parse().unwrap();
+                            let absolute_index = if index.is_negative() {
+                                (vertices.len() as i32) - index
+                            } else {
+                                index.to_owned()
+                            };
+                            positions.push(*vertices.get((absolute_index - 1) as usize).ok_or(ObjError::IndexOutOfRange(index))?);
+                        } else {
                             return Err(ObjError::WrongNumberOfArguments);
                         }
 
-                        let v = vs
-                            .get((v_index - 1) as usize)
-                            .ok_or(ObjError::IndexOutOfRange(v_index))?;
-                        if v.len() < 3 {
-                            return Err(ObjError::WrongNumberOfArguments);
-                        }
-                        positions.push([v[0], v[1], v[2]]);
-
-                        let vt_index = to_absolute_index(e.get(1), vts.len() as u32);
-                        if vt_index != 0 {
-                            let vt = vts
-                                .get((vt_index - 1) as usize)
-                                .ok_or(ObjError::IndexOutOfRange(vt_index))?;
-                            if vt.len() < 1 {
-                                return Err(ObjError::WrongNumberOfArguments);
-                            }
-                            uvs.push([vt[0], *vt.get(1).unwrap_or(&0.0)]);
+                        // Vertex Texture
+                        if let Some(index_str) = indices.next().filter(|index_str| !index_str.is_empty()) {
+                            let index: i32 = index_str.parse().unwrap();
+                            let absolute_index = if index.is_negative() {
+                                (vertices.len() as i32) - index
+                            } else {
+                                index.to_owned()
+                            };
+                            uvs.push(*vertices_texture.get((absolute_index - 1) as usize).ok_or(ObjError::IndexOutOfRange(index))?);
                         }
 
-                        let vn_index = to_absolute_index(e.get(2), vns.len() as u32);
-                        if vn_index != 0 {
-                            let vn = vns
-                                .get((vn_index - 1) as usize)
-                                .ok_or(ObjError::IndexOutOfRange(vn_index))?;
-                            if vn.len() < 3 {
-                                return Err(ObjError::WrongNumberOfArguments);
-                            }
-                            normals.push([vn[0], vn[1], vn[2]]);
+                        // Vertex Normal
+                        if let Some(index_str) = indices.next().filter(|index_str| !index_str.is_empty()) {
+                            let index: i32 = index_str.parse().unwrap();
+                            let absolute_index = if index.is_negative() {
+                                (vertices.len() as i32) - index
+                            } else {
+                                index.to_owned()
+                            };
+                            normals.push(*vertices_normal.get((absolute_index - 1) as usize).ok_or(ObjError::IndexOutOfRange(index))?);
                         }
+
+                        element_count += 1;
+                    }
+
+                    if element_count != 3 {
+                        return Err(ObjError::UnsupportedStatement(line))
                     }
                 }
                 _ => { /*return Err(ObjError::UnknownStatement(stmt.to_string()));*/ }
@@ -168,17 +167,9 @@ async fn load_obj<'a, 'b>(
     }
 
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
-    if !positions.is_empty() {
-        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-    }
-    if !normals.is_empty() {
-        mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-    } else {
-        mesh.compute_flat_normals();
-    }
-    if !uvs.is_empty() {
-        mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
-    }
+    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
     load_context.set_default_asset(LoadedAsset::new(mesh));
 
     Ok(())
