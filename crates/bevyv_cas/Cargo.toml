@@ -1,7 +1,10 @@
 [package]
-name = "bevyv_vfs"
+name = "bevyv_cas"
 version = "0.0.1"
+authors = ["Valaphee <iam@valaphee.com>"]
+license = "Apache License 2.0"
 edition = "2021"
+repository = "https://github.com/valaphee/bevyv"
 description = "File-based content-addressed storage for Bevy."
 
 [dependencies]
