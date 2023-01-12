@@ -48,11 +48,11 @@ impl AssetIo for CasAssetIo {
                     .await;
 
                 // Check file integrity
-                if let Ok(data) = &result {
-                    let mut hasher = Sha1::new();
-                    hasher.update(data);
-                    let data_hash = hasher.finalize();
-                    if hash.0 != data_hash.as_slice() {
+                if let Ok(bytes) = &result {
+                    let mut sha1 = Sha1::new();
+                    sha1.update(bytes);
+                    let current_hash = sha1.finalize();
+                    if hash.0 != current_hash.as_slice() {
                         return Err(AssetIoError::NotFound(path.to_path_buf()));
                     }
                 }

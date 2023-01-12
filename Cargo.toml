@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "bevyv_bis_asset",
     "bevyv_cas",
     "bevyv_obj"
 ]

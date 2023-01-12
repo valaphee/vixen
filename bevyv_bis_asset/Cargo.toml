@@ -1,0 +1,24 @@
+[package]
+name = "bevyv_bis_asset"
+version = "0.0.1"
+authors = ["Valaphee <iam@valaphee.com>"]
+license = "Apache License 2.0"
+edition = "2021"
+repository = "https://github.com/valaphee/bevyv"
+description = "Bohemia asset support for Bevy."
+
+[dependencies]
+anyhow = "1.0"
+bevy = { version = "0.9", default-features = false, features = ["bevy_asset"] }
+bincode = "2.0.0-rc.2"
+
+[dev-dependencies]
+bevy = { version = "0.9", default-features = false, features = [
+    "bevy_asset",
+    "bevy_core_pipeline",
+    "bevy_pbr",
+    "bevy_render",
+    "bevy_scene",
+    "bevy_winit",
+    "x11"
+] }

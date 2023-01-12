@@ -1,3 +1,4 @@
+use anyhow::Result;
 use bevy::{
     asset::{AssetLoader, BoxedFuture, LoadContext, LoadedAsset},
     prelude::*,
@@ -24,7 +25,7 @@ impl AssetLoader for ObjLoader {
         &'a self,
         bytes: &'a [u8],
         load_context: &'a mut LoadContext,
-    ) -> BoxedFuture<'a, anyhow::Result<()>> {
+    ) -> BoxedFuture<'a, Result<()>> {
         Box::pin(async move { Ok(load_obj(bytes, load_context).await?) })
     }
 
@@ -191,14 +192,4 @@ async fn load_obj<'a, 'b>(
     load_context.set_default_asset(LoadedAsset::new(mesh));
 
     Ok(())
-}
-
-fn to_absolute_index(index: Option<&i32>, last_index: u32) -> u32 {
-    index.map_or(0, |index| {
-        if index.is_negative() {
-            (last_index as i32) - index
-        } else {
-            index.to_owned()
-        }
-    } as u32)
 }
