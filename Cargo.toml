@@ -1,10 +1,6 @@
-[package]
-name = "bevyv"
-version = "0.0.1"
-authors = ["Valaphee <iam@valaphee.com>"]
-license = "Apache License 2.0"
-edition = "2021"
-repository = "https://github.com/valaphee/bevyv"
-
 [workspace]
-members = ["crates/*"]
+members = [
+    "bevyv_cas",
+    "bevyv_obj"
+]
+resolver = "2"
