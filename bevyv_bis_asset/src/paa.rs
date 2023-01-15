@@ -29,34 +29,36 @@ impl AssetLoader for PaaLoader {
 enum PaaError {
     #[error("unknown tag: {0}")]
     UnknownTag(String),
+    #[error("invalid tag")]
+    InvalidTag,
 }
 
 async fn load_paa<'a, 'b>(bytes: &'a [u8], load_context: &'a mut LoadContext<'b>) -> Result<()> {
     let file = Paa::read_from(&mut Cursor::new(bytes.to_vec()))?;
 
     let mut image = Image::default();
-    image.texture_descriptor.format = match file.kind {
-        PaaKind::Dxt1 => TextureFormat::Bc1RgbaUnorm,
-        PaaKind::Dxt5 => TextureFormat::Bc3RgbaUnorm,
-    };
+    image.texture_descriptor.format = file.kind.texture_format();
     image.texture_descriptor.mip_level_count = file.mipmaps.len() as u32;
-    {
+    let (width, height) = {
         let PaaMipmap {
             width,
             height,
             data: _,
         } = file.mipmaps.first().unwrap();
-        image.texture_descriptor.size = Extent3d {
-            width: *width as u32,
-            height: *height as u32,
-            depth_or_array_layers: 1,
-        };
-    }
-    let mut data: Vec<u8> = Vec::new();
-    for mipmap in file.mipmaps {
-        data.extend(mipmap.data);
+        (*width as u32, *height as u32)
+    };
+    image.texture_descriptor.size = Extent3d {
+        width,
+        height,
+        depth_or_array_layers: 1,
+    };
+
+    let mut data: Vec<_> = Vec::with_capacity((width * height * 2) as usize);
+    for mut mipmap in file.mipmaps {
+        data.append(&mut mipmap.data);
     }
     image.data = data;
+
     load_context.set_default_asset(LoadedAsset::new(image));
 
     Ok(())
@@ -119,8 +121,15 @@ impl PaaKind {
 
     fn size(&self, width: usize, height: usize) -> usize {
         match self {
-            Self::Dxt1 => ((width + 3) & !3) * ((height + 3) & !3) / 2,
-            Self::Dxt5 => ((width + 3) & !3) * ((height + 3) & !3),
+            Self::Dxt1 => next_multiple_of(width, 4) * next_multiple_of(height, 4) / 2,
+            Self::Dxt5 => next_multiple_of(width, 4) * next_multiple_of(height, 4),
+        }
+    }
+
+    fn texture_format(&self) -> TextureFormat {
+        match self {
+            Self::Dxt1 => TextureFormat::Bc1RgbaUnorm,
+            Self::Dxt5 => TextureFormat::Bc3RgbaUnorm,
         }
     }
 }
@@ -142,12 +151,36 @@ impl PaaTag {
         let length = input.read_u32::<LittleEndian>()?;
 
         Ok(match name.as_str() {
-            "AVGCTAGG" => PaaTag::AverageColor(input.read_u32::<LittleEndian>()?),
-            "MAXCTAGG" => PaaTag::MaximumColor(input.read_u32::<LittleEndian>()?),
-            "SWIZTAGG" => PaaTag::Swizzle(input.read_u32::<LittleEndian>()?),
-            "OFFSTAGG" => PaaTag::Offsets(core::array::from_fn(|_| {
-                input.read_u32::<LittleEndian>().unwrap()
-            })),
+            "AVGCTAGG" => {
+                if length != 4 {
+                    bail!(PaaError::InvalidTag)
+                }
+
+                PaaTag::AverageColor(input.read_u32::<LittleEndian>()?)
+            }
+            "MAXCTAGG" => {
+                if length != 4 {
+                    bail!(PaaError::InvalidTag)
+                }
+
+                PaaTag::MaximumColor(input.read_u32::<LittleEndian>()?)
+            }
+            "SWIZTAGG" => {
+                if length != 4 {
+                    bail!(PaaError::InvalidTag)
+                }
+
+                PaaTag::Swizzle(input.read_u32::<LittleEndian>()?)
+            }
+            "OFFSTAGG" => {
+                if length != 64 {
+                    bail!(PaaError::InvalidTag)
+                }
+
+                PaaTag::Offsets(core::array::from_fn(|_| {
+                    input.read_u32::<LittleEndian>().unwrap()
+                }))
+            }
             _ => bail!(PaaError::UnknownTag(name)),
         })
     }
@@ -188,4 +221,9 @@ impl PaaMipmap {
             data,
         })
     }
+}
+
+#[inline]
+fn next_multiple_of(value: usize, rhs: usize) -> usize {
+    (value + (rhs - 1)) & !rhs
 }

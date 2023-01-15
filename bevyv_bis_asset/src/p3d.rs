@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use bevy::{
     asset::{AssetLoader, BoxedFuture, LoadContext, LoadedAsset},
     prelude::*,
@@ -6,6 +6,7 @@ use bevy::{
 };
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::io::{Cursor, Read};
+use thiserror::Error;
 
 #[derive(Default)]
 pub struct P3dLoader;
@@ -22,6 +23,14 @@ impl AssetLoader for P3dLoader {
     fn extensions(&self) -> &[&str] {
         &["p3d"]
     }
+}
+
+#[derive(Error, Debug)]
+enum P3dError {
+    #[error("invalid magic")]
+    InvalidMagic,
+    #[error("unknown version: {0}")]
+    UnknownVersion(String),
 }
 
 async fn load_mlod<'a, 'b>(bytes: &'a [u8], load_context: &'a mut LoadContext<'b>) -> Result<()> {
@@ -88,9 +97,13 @@ struct Mlod(Vec<P3dm>);
 
 impl Mlod {
     fn read_from<R: Read>(input: &mut R) -> Result<Mlod> {
-        if input.read_u32::<LittleEndian>()? != 0x444F4C4D { // Magic "MLOD"
+        if input.read_u32::<LittleEndian>()? != 0x444F4C4D {
+            // Magic "MLOD"
+            bail!(P3dError::InvalidMagic)
         }
-        if input.read_u32::<LittleEndian>()? != 0x101 { // Version
+        let version = input.read_u32::<LittleEndian>()?;
+        if version != 0x101 {
+            bail!(P3dError::UnknownVersion(version.to_string()))
         }
 
         let lod_count = input.read_u32::<LittleEndian>()?;
@@ -115,9 +128,16 @@ struct P3dm {
 
 impl P3dm {
     fn read_from<R: Read>(input: &mut R) -> Result<P3dm> {
-        if input.read_u32::<LittleEndian>()? != 0x4D443350 { // Magic "P3DM"
+        if input.read_u32::<LittleEndian>()? != 0x4D443350 {
+            // Magic "P3DM"
+            bail!(P3dError::InvalidMagic)
         }
-        if input.read_u32::<LittleEndian>()? != 0x1C || input.read_u32::<LittleEndian>()? != 0x100 { // Version
+        let major_version = input.read_u32::<LittleEndian>()?;
+        let minor_version = input.read_u32::<LittleEndian>()?;
+        if major_version != 0x1C && minor_version != 0x101 {
+            bail!(P3dError::UnknownVersion(format!(
+                "{major_version}.{minor_version}"
+            )))
         }
 
         let point_count = input.read_u32::<LittleEndian>()?;
@@ -139,7 +159,9 @@ impl P3dm {
             faces.push(P3dModelFace::read_from(input)?);
         }
 
-        if input.read_u32::<LittleEndian>()? != 0x47474154 { // Magic "TAGG"
+        if input.read_u32::<LittleEndian>()? != 0x47474154 {
+            // Magic "TAGG"
+            bail!(P3dError::InvalidMagic)
         }
         let mut tags = Vec::new();
         loop {
@@ -238,6 +260,7 @@ impl P3dModelTag {
     }
 }
 
+#[inline]
 fn read_asciiz<R: Read>(input: &mut R) -> Result<String> {
     let mut data = Vec::new();
     loop {

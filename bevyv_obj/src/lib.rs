@@ -29,7 +29,7 @@ impl AssetLoader for ObjLoader {
 enum ObjError {
     #[error("wrong number of arguments")]
     WrongNumberOfArguments,
-    #[error("index out of range")]
+    #[error("index out of range: {0}")]
     IndexOutOfRange(i32),
     #[error("unsupported statement: {0}")]
     UnsupportedStatement(String),
