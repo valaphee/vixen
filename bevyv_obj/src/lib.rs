@@ -101,69 +101,50 @@ async fn load_obj<'a, 'b>(bytes: &'a [u8], load_context: &'a mut LoadContext<'b>
                     ]);
                 }
                 "f" => {
-                    let mut element_count = 0;
+                    let element_a = line_iter.next().ok_or(ObjError::WrongNumberOfArguments)?;
+                    let mut element_b = line_iter.next().ok_or(ObjError::WrongNumberOfArguments)?;
+                    for element_c in line_iter {
+                        for element in [element_a, element_b, element_c] {
+                            let mut indices = element.split('/');
 
-                    // Go through all arguments (in this case elements)
-                    for element in line_iter {
-                        let mut indices = element.split('/');
-
-                        // Vertex, has to be always present
-                        if let Some(index_str) = indices.next() {
-                            let index: i32 = index_str.parse()?;
-                            let absolute_index = if index.is_negative() {
-                                (vertices.len() as i32) - index
+                            // Vertex, has to be always present
+                            if let Some(index_str) = indices.next() {
+                                let index: i32 = index_str.parse()?;
+                                positions.push(
+                                    *vertices
+                                        .get(absolute_index(index, vertices.len()))
+                                        .ok_or(ObjError::IndexOutOfRange(index))?,
+                                );
                             } else {
-                                index.to_owned()
-                            };
-                            positions.push(
-                                *vertices
-                                    .get((absolute_index - 1) as usize)
-                                    .ok_or(ObjError::IndexOutOfRange(index))?,
-                            );
-                        } else {
-                            bail!(ObjError::WrongNumberOfArguments);
+                                bail!(ObjError::WrongNumberOfArguments);
+                            }
+
+                            // Vertex Texture
+                            if let Some(index_str) =
+                                indices.next().filter(|index_str| !index_str.is_empty())
+                            {
+                                let index: i32 = index_str.parse()?;
+                                uvs.push(
+                                    *vertices_texture
+                                        .get(absolute_index(index, vertices_texture.len()))
+                                        .ok_or(ObjError::IndexOutOfRange(index))?,
+                                );
+                            }
+
+                            // Vertex Normal
+                            if let Some(index_str) =
+                                indices.next().filter(|index_str| !index_str.is_empty())
+                            {
+                                let index: i32 = index_str.parse()?;
+                                normals.push(
+                                    *vertices_normal
+                                        .get(absolute_index(index, vertices_texture.len()))
+                                        .ok_or(ObjError::IndexOutOfRange(index))?,
+                                );
+                            }
+
+                            element_b = element_c;
                         }
-
-                        // Vertex Texture
-                        if let Some(index_str) =
-                            indices.next().filter(|index_str| !index_str.is_empty())
-                        {
-                            let index: i32 = index_str.parse()?;
-                            let absolute_index = if index.is_negative() {
-                                (vertices.len() as i32) - index
-                            } else {
-                                index.to_owned()
-                            };
-                            uvs.push(
-                                *vertices_texture
-                                    .get((absolute_index - 1) as usize)
-                                    .ok_or(ObjError::IndexOutOfRange(index))?,
-                            );
-                        }
-
-                        // Vertex Normal
-                        if let Some(index_str) =
-                            indices.next().filter(|index_str| !index_str.is_empty())
-                        {
-                            let index: i32 = index_str.parse()?;
-                            let absolute_index = if index.is_negative() {
-                                (vertices.len() as i32) - index
-                            } else {
-                                index.to_owned()
-                            };
-                            normals.push(
-                                *vertices_normal
-                                    .get((absolute_index - 1) as usize)
-                                    .ok_or(ObjError::IndexOutOfRange(index))?,
-                            );
-                        }
-
-                        element_count += 1;
-                    }
-
-                    // At the moment, only triangles are supported
-                    if element_count != 3 {
-                        bail!(ObjError::UnsupportedStatement(line));
                     }
                 }
                 _ => { /*return Err(ObjError::UnknownStatement(stmt.to_string()));*/ }
@@ -174,9 +155,23 @@ async fn load_obj<'a, 'b>(bytes: &'a [u8], load_context: &'a mut LoadContext<'b>
     // Create mesh, and set it as default asset
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+    if !normals.is_empty() {
+        mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+    } else {
+        mesh.compute_flat_normals()
+    }
+    if !uvs.is_empty() {
+        mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+    }
     load_context.set_default_asset(LoadedAsset::new(mesh));
 
     Ok(())
+}
+
+fn absolute_index(index: i32, relative_to: usize) -> usize {
+    (if index.is_negative() {
+        relative_to as i32 - index
+    } else {
+        index
+    } - 1) as usize
 }
