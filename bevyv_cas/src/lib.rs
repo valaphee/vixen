@@ -11,8 +11,9 @@ use std::path::{Path, PathBuf};
 
 /// File-based content addressed storage asset io.
 ///
-/// Uses an index for associating file paths with their corresponding hashes, which makes updating
-/// assets easier, allows version selection, without updating assets, and eliminates file duplicates.
+/// Uses an index for associating file paths with their corresponding hashes, which allows version
+/// updates and only updating changed or downloading new assets, eliminates file duplicates and
+/// doesn't allow access to files which aren't in the index.
 pub struct CasAssetIo {
     parent: Box<dyn AssetIo>,
     index: HashMap<String, Hash>,
@@ -20,6 +21,7 @@ pub struct CasAssetIo {
 
 impl CasAssetIo {
     pub fn new(parent: Box<dyn AssetIo>) -> Self {
+        // Load index, which contains all paths, and their associated hashes
         let index = future::block_on(parent.load_path(Path::new("index.json"))).unwrap();
 
         Self {
@@ -66,16 +68,16 @@ impl AssetIo for CasAssetIo {
 
     fn read_directory(
         &self,
-        path: &Path,
+        _path: &Path,
     ) -> Result<Box<dyn Iterator<Item = PathBuf>>, AssetIoError> {
         todo!()
     }
 
-    fn get_metadata(&self, path: &Path) -> Result<Metadata, AssetIoError> {
+    fn get_metadata(&self, _path: &Path) -> Result<Metadata, AssetIoError> {
         todo!()
     }
 
-    fn watch_path_for_changes(&self, path: &Path) -> Result<(), AssetIoError> {
+    fn watch_path_for_changes(&self, _path: &Path) -> Result<(), AssetIoError> {
         Ok(())
     }
 

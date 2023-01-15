@@ -17,7 +17,7 @@ impl AssetLoader for ObjLoader {
         bytes: &'a [u8],
         load_context: &'a mut LoadContext,
     ) -> BoxedFuture<'a, Result<()>> {
-        Box::pin(async move { Ok(load_obj(bytes, load_context).await?) })
+        Box::pin(async move { load_obj(bytes, load_context).await })
     }
 
     fn extensions(&self) -> &[&str] {
@@ -45,11 +45,14 @@ async fn load_obj<'a, 'b>(bytes: &'a [u8], load_context: &'a mut LoadContext<'b>
     let mut normals: Vec<[f32; 3]> = Vec::new();
     let mut uvs: Vec<[f32; 2]> = Vec::new();
 
+    // Go through all lines, one by one
     for line in bytes.lines().map(|line| line.unwrap()) {
+        // Ignore comments
         if line.starts_with('#') {
             continue;
         }
 
+        // And split line into statement and arguments
         let mut line_iter = line.split_whitespace();
         if let Some(statement) = line_iter.next() {
             match statement {
@@ -100,10 +103,11 @@ async fn load_obj<'a, 'b>(bytes: &'a [u8], load_context: &'a mut LoadContext<'b>
                 "f" => {
                     let mut element_count = 0;
 
+                    // Go through all arguments (in this case elements)
                     for element in line_iter {
                         let mut indices = element.split('/');
 
-                        // Vertex
+                        // Vertex, has to be always present
                         if let Some(index_str) = indices.next() {
                             let index: i32 = index_str.parse()?;
                             let absolute_index = if index.is_negative() {
@@ -157,6 +161,7 @@ async fn load_obj<'a, 'b>(bytes: &'a [u8], load_context: &'a mut LoadContext<'b>
                         element_count += 1;
                     }
 
+                    // At the moment, only triangles are supported
                     if element_count != 3 {
                         bail!(ObjError::UnsupportedStatement(line));
                     }
@@ -166,6 +171,7 @@ async fn load_obj<'a, 'b>(bytes: &'a [u8], load_context: &'a mut LoadContext<'b>
         }
     }
 
+    // Create mesh, and set it as default asset
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
