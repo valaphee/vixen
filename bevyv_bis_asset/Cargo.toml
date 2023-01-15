@@ -9,8 +9,10 @@ description = "Bohemia asset support for Bevy."
 
 [dependencies]
 anyhow = "1.0"
-bevy = { version = "0.9", default-features = false, features = ["bevy_asset"] }
-bincode = "2.0.0-rc.2"
+bevy = { version = "0.9", default-features = false, features = ["bevy_asset", "bevy_render"] }
+byteorder = "1.4"
+minilzo = "0.2"
+thiserror = "1.0"
 
 [dev-dependencies]
 bevy = { version = "0.9", default-features = false, features = [

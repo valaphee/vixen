@@ -1,9 +1,10 @@
 use bevy::prelude::*;
+use bevyv_obj::ObjLoader;
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugin(bevyv_obj::ObjPlugin)
+        .init_asset_loader::<ObjLoader>()
         .add_startup_system(setup)
         .run();
 }

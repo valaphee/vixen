@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use bevy::{
     asset::{AssetLoader, BoxedFuture, LoadContext, LoadedAsset},
     prelude::*,
@@ -6,15 +6,6 @@ use bevy::{
 };
 use std::io::BufRead;
 use thiserror::Error;
-
-#[derive(Default)]
-pub struct ObjPlugin;
-
-impl Plugin for ObjPlugin {
-    fn build(&self, app: &mut App) {
-        app.init_asset_loader::<ObjLoader>();
-    }
-}
 
 /// Wavefront OBJ asset loader.
 #[derive(Default)]
@@ -45,10 +36,7 @@ enum ObjError {
 }
 
 // See http://paulbourke.net/dataformats/obj/
-async fn load_obj<'a, 'b>(
-    bytes: &'a [u8],
-    load_context: &'a mut LoadContext<'b>,
-) -> Result<(), ObjError> {
+async fn load_obj<'a, 'b>(bytes: &'a [u8], load_context: &'a mut LoadContext<'b>) -> Result<()> {
     let mut vertices: Vec<[f32; 3]> = Vec::new();
     let mut vertices_texture: Vec<[f32; 2]> = Vec::new();
     let mut vertices_normal: Vec<[f32; 3]> = Vec::new();
@@ -70,18 +58,15 @@ async fn load_obj<'a, 'b>(
                         line_iter
                             .next()
                             .ok_or(ObjError::WrongNumberOfArguments)?
-                            .parse()
-                            .unwrap(),
+                            .parse()?,
                         line_iter
                             .next()
                             .ok_or(ObjError::WrongNumberOfArguments)?
-                            .parse()
-                            .unwrap(),
+                            .parse()?,
                         line_iter
                             .next()
                             .ok_or(ObjError::WrongNumberOfArguments)?
-                            .parse()
-                            .unwrap(),
+                            .parse()?,
                     ]);
                 }
                 "vt" => {
@@ -89,8 +74,7 @@ async fn load_obj<'a, 'b>(
                         line_iter
                             .next()
                             .ok_or(ObjError::WrongNumberOfArguments)?
-                            .parse()
-                            .unwrap(),
+                            .parse()?,
                         line_iter
                             .next()
                             .map(|elem| elem.parse().unwrap())
@@ -102,18 +86,15 @@ async fn load_obj<'a, 'b>(
                         line_iter
                             .next()
                             .ok_or(ObjError::WrongNumberOfArguments)?
-                            .parse()
-                            .unwrap(),
+                            .parse()?,
                         line_iter
                             .next()
                             .ok_or(ObjError::WrongNumberOfArguments)?
-                            .parse()
-                            .unwrap(),
+                            .parse()?,
                         line_iter
                             .next()
                             .ok_or(ObjError::WrongNumberOfArguments)?
-                            .parse()
-                            .unwrap(),
+                            .parse()?,
                     ]);
                 }
                 "f" => {
@@ -124,7 +105,7 @@ async fn load_obj<'a, 'b>(
 
                         // Vertex
                         if let Some(index_str) = indices.next() {
-                            let index: i32 = index_str.parse().unwrap();
+                            let index: i32 = index_str.parse()?;
                             let absolute_index = if index.is_negative() {
                                 (vertices.len() as i32) - index
                             } else {
@@ -136,14 +117,14 @@ async fn load_obj<'a, 'b>(
                                     .ok_or(ObjError::IndexOutOfRange(index))?,
                             );
                         } else {
-                            return Err(ObjError::WrongNumberOfArguments);
+                            bail!(ObjError::WrongNumberOfArguments);
                         }
 
                         // Vertex Texture
                         if let Some(index_str) =
                             indices.next().filter(|index_str| !index_str.is_empty())
                         {
-                            let index: i32 = index_str.parse().unwrap();
+                            let index: i32 = index_str.parse()?;
                             let absolute_index = if index.is_negative() {
                                 (vertices.len() as i32) - index
                             } else {
@@ -160,7 +141,7 @@ async fn load_obj<'a, 'b>(
                         if let Some(index_str) =
                             indices.next().filter(|index_str| !index_str.is_empty())
                         {
-                            let index: i32 = index_str.parse().unwrap();
+                            let index: i32 = index_str.parse()?;
                             let absolute_index = if index.is_negative() {
                                 (vertices.len() as i32) - index
                             } else {
@@ -177,7 +158,7 @@ async fn load_obj<'a, 'b>(
                     }
 
                     if element_count != 3 {
-                        return Err(ObjError::UnsupportedStatement(line));
+                        bail!(ObjError::UnsupportedStatement(line));
                     }
                 }
                 _ => { /*return Err(ObjError::UnknownStatement(stmt.to_string()));*/ }

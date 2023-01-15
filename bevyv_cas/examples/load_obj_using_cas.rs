@@ -1,12 +1,12 @@
 use bevy::prelude::*;
 use bevyv_cas::CasAssetIo;
-use bevyv_obj::ObjPlugin;
+use bevyv_obj::ObjLoader;
 
 fn main() {
     App::new()
         .insert_resource(AssetServer::new(CasAssetIo::default()))
         .add_plugins(DefaultPlugins)
-        .add_plugin(ObjPlugin)
+        .init_asset_loader::<ObjLoader>()
         .add_startup_system(setup)
         .run();
 }
