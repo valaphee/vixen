@@ -1,4 +1,3 @@
-
 use anyhow::{bail, Result};
 use bevy::{
     asset::{AssetLoader, BoxedFuture, LoadContext, LoadedAsset},
@@ -33,19 +32,31 @@ enum PaaError {
 }
 
 async fn load_paa<'a, 'b>(bytes: &'a [u8], load_context: &'a mut LoadContext<'b>) -> Result<()> {
-    let paa = Paa::read_from(&mut Cursor::new(bytes.to_vec()))?;
-    let mipmap = paa.mipmaps.first().unwrap();
+    let file = Paa::read_from(&mut Cursor::new(bytes.to_vec()))?;
+
     let mut image = Image::default();
-    image.texture_descriptor.size = Extent3d {
-        width: mipmap.width as u32,
-        height: mipmap.height as u32,
-        depth_or_array_layers: 1,
-    };
-    image.texture_descriptor.format = match paa.kind {
+    image.texture_descriptor.format = match file.kind {
         PaaKind::Dxt1 => TextureFormat::Bc1RgbaUnorm,
         PaaKind::Dxt5 => TextureFormat::Bc3RgbaUnorm,
     };
-    image.data = mipmap.data.clone();
+    image.texture_descriptor.mip_level_count = file.mipmaps.len() as u32;
+    {
+        let PaaMipmap {
+            width,
+            height,
+            data: _,
+        } = file.mipmaps.first().unwrap();
+        image.texture_descriptor.size = Extent3d {
+            width: *width as u32,
+            height: *height as u32,
+            depth_or_array_layers: 1,
+        };
+    }
+    let mut data: Vec<u8> = Vec::new();
+    for mipmap in file.mipmaps {
+        data.extend(mipmap.data);
+    }
+    image.data = data;
     load_context.set_default_asset(LoadedAsset::new(image));
 
     Ok(())
@@ -71,13 +82,11 @@ impl Paa {
         }
         input.seek(SeekFrom::Start(position))?;
 
-
         let palette_size = input.read_u16::<LittleEndian>()?;
         let mut palette = Vec::new();
         for _ in 0..palette_size {
             palette.push(input.read_u24::<LittleEndian>()?);
         }
-
 
         let mut mipmaps = Vec::new();
         while let Ok(mipmap) = PaaMipmap::read_from(input, &kind) {
@@ -136,7 +145,9 @@ impl PaaTag {
             "AVGCTAGG" => PaaTag::AverageColor(input.read_u32::<LittleEndian>()?),
             "MAXCTAGG" => PaaTag::MaximumColor(input.read_u32::<LittleEndian>()?),
             "SWIZTAGG" => PaaTag::Swizzle(input.read_u32::<LittleEndian>()?),
-            "OFFSTAGG" => PaaTag::Offsets(core::array::from_fn(|_| input.read_u32::<LittleEndian>().unwrap())),
+            "OFFSTAGG" => PaaTag::Offsets(core::array::from_fn(|_| {
+                input.read_u32::<LittleEndian>().unwrap()
+            })),
             _ => bail!(PaaError::UnknownTag(name)),
         })
     }

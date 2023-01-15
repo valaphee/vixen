@@ -1,4 +1,3 @@
-use std::io::{Cursor, Read};
 use anyhow::Result;
 use bevy::{
     asset::{AssetLoader, BoxedFuture, LoadContext, LoadedAsset},
@@ -6,6 +5,7 @@ use bevy::{
     render::mesh::{Indices, PrimitiveTopology},
 };
 use byteorder::{LittleEndian, ReadBytesExt};
+use std::io::{Cursor, Read};
 
 #[derive(Default)]
 pub struct P3dLoader;
@@ -25,9 +25,9 @@ impl AssetLoader for P3dLoader {
 }
 
 async fn load_mlod<'a, 'b>(bytes: &'a [u8], load_context: &'a mut LoadContext<'b>) -> Result<()> {
-    let mlod = Mlod::read_from(&mut Cursor::new(bytes.to_vec()))?;
+    let file = Mlod::read_from(&mut Cursor::new(bytes.to_vec()))?;
 
-    for (i, model) in mlod.0.iter().enumerate() {
+    for (i, model) in file.0.iter().enumerate() {
         let mut positions = Vec::new();
         let mut normals = Vec::new();
         let mut uvs = Vec::new();
@@ -89,10 +89,8 @@ struct Mlod(Vec<P3dm>);
 impl Mlod {
     fn read_from<R: Read>(input: &mut R) -> Result<Mlod> {
         if input.read_u32::<LittleEndian>()? != 0x444F4C4D { // Magic "MLOD"
-
         }
         if input.read_u32::<LittleEndian>()? != 0x101 { // Version
-
         }
 
         let lod_count = input.read_u32::<LittleEndian>()?;
@@ -118,10 +116,8 @@ struct P3dm {
 impl P3dm {
     fn read_from<R: Read>(input: &mut R) -> Result<P3dm> {
         if input.read_u32::<LittleEndian>()? != 0x4D443350 { // Magic "P3DM"
-
         }
         if input.read_u32::<LittleEndian>()? != 0x1C || input.read_u32::<LittleEndian>()? != 0x100 { // Version
-
         }
 
         let point_count = input.read_u32::<LittleEndian>()?;
@@ -134,7 +130,9 @@ impl P3dm {
         }
         let mut normals = Vec::with_capacity(normal_count as usize);
         for _ in 0..normal_count {
-            normals.push(core::array::from_fn(|_| input.read_f32::<LittleEndian>().unwrap()));
+            normals.push(core::array::from_fn(|_| {
+                input.read_f32::<LittleEndian>().unwrap()
+            }));
         }
         let mut faces = Vec::with_capacity(face_count as usize);
         for _ in 0..face_count {
@@ -142,7 +140,6 @@ impl P3dm {
         }
 
         if input.read_u32::<LittleEndian>()? != 0x47474154 { // Magic "TAGG"
-
         }
         let mut tags = Vec::new();
         loop {
@@ -176,7 +173,7 @@ impl P3dModelPoint {
     fn read_from<R: Read>(input: &mut R) -> Result<P3dModelPoint> {
         Ok(Self {
             position: core::array::from_fn(|_| input.read_f32::<LittleEndian>().unwrap()),
-            flags: input.read_u32::<LittleEndian>()?
+            flags: input.read_u32::<LittleEndian>()?,
         })
     }
 }
@@ -197,7 +194,7 @@ impl P3dModelFace {
             vertices: core::array::from_fn(|_| P3dModelVertex::read_from(input).unwrap()),
             flags: input.read_u32::<LittleEndian>()?,
             texture_name: read_asciiz(input)?,
-            material_name: read_asciiz(input)?
+            material_name: read_asciiz(input)?,
         })
     }
 }
@@ -236,7 +233,7 @@ impl P3dModelTag {
                 data.resize(input.read_u32::<LittleEndian>()? as usize, 0);
                 input.read_exact(&mut data)?;
                 data
-            }
+            },
         })
     }
 }
