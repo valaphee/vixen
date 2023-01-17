@@ -2,9 +2,7 @@
 members = [
     "vixen_bis_asset",
     "vixen_cas",
-    "vixen_obj",
-    "vixen_steamaudio",
-    "vixen_steamaudio_sys"
+    "vixen_obj"
 ]
 resolver = "2"
 
