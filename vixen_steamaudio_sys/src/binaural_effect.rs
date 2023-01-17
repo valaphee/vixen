@@ -1,7 +1,7 @@
+use crate::error::check;
 use crate::ffi;
 use crate::prelude::*;
 use glam::Vec3;
-use crate::error::check;
 
 pub struct BinauralEffect<'a> {
     pub(crate) inner: ffi::IPLBinauralEffect,
@@ -10,27 +10,45 @@ pub struct BinauralEffect<'a> {
 }
 
 impl<'a> BinauralEffect<'a> {
-    pub fn new(context: &Context, sample_rate: u32, frame_length: u32, hrtf: &'a Hrtf) -> Result<Self, Error> {
+    pub fn new(
+        context: &Context,
+        sample_rate: u32,
+        frame_length: u32,
+        hrtf: &'a Hrtf,
+    ) -> Result<Self, Error> {
         let audio_settings = ffi::IPLAudioSettings {
             samplingRate: sample_rate as i32,
             frameSize: frame_length as i32,
         };
         let effect_settings = ffi::IPLBinauralEffectSettings { hrtf: hrtf.inner };
-        let mut effect: ffi::IPLBinauralEffect = unsafe { std::mem::zeroed() };
+        let mut effect = std::ptr::null_mut();
 
         unsafe {
-            check(ffi::iplBinauralEffectCreate(
-                context.inner,
-                &audio_settings,
-                &effect_settings,
-                &mut effect,
-            ), ())?;
+            check(
+                ffi::iplBinauralEffectCreate(
+                    context.inner,
+                    &audio_settings,
+                    &effect_settings,
+                    &mut effect,
+                ),
+                (),
+            )?;
         }
 
-        Ok(Self { inner: effect, hrtf })
+        Ok(Self {
+            inner: effect,
+            hrtf,
+        })
     }
 
-    pub fn apply(&self, direction: Vec3, interpolation: HrtfInterpolation, spatial_bend: f32, in_: &Buffer, out: &mut Buffer) {
+    pub fn apply(
+        &self,
+        direction: Vec3,
+        interpolation: HrtfInterpolation,
+        spatial_bend: f32,
+        in_: &Buffer,
+        out: &mut Buffer,
+    ) {
         let params = ffi::IPLBinauralEffectParams {
             direction: direction.into(),
             interpolation: interpolation.into(),
@@ -40,12 +58,7 @@ impl<'a> BinauralEffect<'a> {
         };
 
         unsafe {
-            ffi::iplBinauralEffectApply(
-                self.inner,
-                &params,
-                &in_.inner,
-                &mut out.inner,
-            );
+            ffi::iplBinauralEffectApply(self.inner, &params, &in_.inner, &mut out.inner);
         }
     }
 }
@@ -59,7 +72,7 @@ impl<'a> Clone for BinauralEffect<'a> {
             ffi::iplBinauralEffectRetain(self.inner);
         }
 
-        BinauralEffect {
+        Self {
             inner: self.inner,
             hrtf: self.hrtf,
         }
@@ -70,6 +83,20 @@ impl<'a> Drop for BinauralEffect<'a> {
     fn drop(&mut self) {
         unsafe {
             ffi::iplBinauralEffectRelease(&mut self.inner);
+        }
+    }
+}
+
+pub enum HrtfInterpolation {
+    Nearest,
+    Bilinear,
+}
+
+impl Into<ffi::IPLHRTFInterpolation> for HrtfInterpolation {
+    fn into(self) -> ffi::IPLHRTFInterpolation {
+        match self {
+            Self::Nearest => ffi::IPLHRTFInterpolation_IPL_HRTFINTERPOLATION_NEAREST,
+            Self::Bilinear => ffi::IPLHRTFInterpolation_IPL_HRTFINTERPOLATION_BILINEAR,
         }
     }
 }

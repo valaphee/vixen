@@ -8,18 +8,7 @@ repository = "https://github.com/valaphee/vixen.git"
 description = "Steam Audio integration for Bevy."
 
 [dependencies]
-bevy = { version = "0.9", default-features = false, features = ["bevy_asset", "bevy_audio"] }
-
-[dev-dependencies]
-bevy = { version = "0.9", default-features = false, features = [
-    "bevy_asset",
-    "bevy_audio",
-    "bevy_core_pipeline",
-    "bevy_pbr",
-    "bevy_render",
-    "bevy_scene",
-    "bevy_winit",
-    "jpeg",
-    "x11"
-] }
-vixen_obj = { path = "../vixen_obj" }
+anyhow = "1.0"
+bevy = { version = "0.9", default-features = false, features = ["bevy_asset"] }
+rodio = { version = "0.16", default-features = false, features = ["mp3"] }
+vixen_steamaudio_sys = { path = "../vixen_steamaudio_sys" }

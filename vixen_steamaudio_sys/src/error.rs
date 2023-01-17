@@ -18,6 +18,6 @@ pub(crate) fn check<T>(status: ffi::IPLerror, value: T) -> Result<T, Error> {
         ffi::IPLerror_IPL_STATUS_FAILURE => Err(Error::Failure),
         ffi::IPLerror_IPL_STATUS_OUTOFMEMORY => Err(Error::OutOfMemory),
         ffi::IPLerror_IPL_STATUS_INITIALIZATION => Err(Error::Initialization),
-        _ => unreachable!()
+        _ => unreachable!(),
     }
 }

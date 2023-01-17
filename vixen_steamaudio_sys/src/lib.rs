@@ -1,8 +1,14 @@
+pub mod ambisonics_binaural_effect;
+pub mod ambisonics_decode_effect;
+pub mod ambisonics_encode_effect;
+pub mod ambisonics_panning_effect;
+pub mod ambisonics_rotation_effect;
 pub mod binaural_effect;
 pub mod buffer;
 pub mod context;
 pub mod direct_effect;
 pub mod error;
+pub mod geometry;
 pub mod hrtf;
 
 pub mod ffi {
@@ -10,30 +16,15 @@ pub mod ffi {
 }
 
 pub mod prelude {
-    pub use crate::binaural_effect::BinauralEffect;
-    pub use crate::buffer::Buffer;
+    pub use crate::ambisonics_binaural_effect::AmbisonicsBinauralEffect;
+    pub use crate::ambisonics_decode_effect::AmbisonicsDecodeEffect;
+    pub use crate::ambisonics_encode_effect::AmbisonicsEncodeEffect;
+    pub use crate::ambisonics_panning_effect::AmbisonicsPanningEffect;
+    pub use crate::ambisonics_rotation_effect::AmbisonicsRotationEffect;
+    pub use crate::binaural_effect::{BinauralEffect, HrtfInterpolation};
+    pub use crate::buffer::{Buffer, SpeakerLayout};
     pub use crate::context::Context;
     pub use crate::direct_effect::DirectEffect;
     pub use crate::error::Error;
-    pub use crate::hrtf::{Hrtf, HrtfInterpolation, HrtfType};
-}
-
-impl From<glam::Vec3> for ffi::IPLVector3 {
-    fn from(value: glam::Vec3) -> Self {
-        Self {
-            x: value.x,
-            y: value.y,
-            z: value.z,
-        }
-    }
-}
-
-impl From<&glam::Vec3> for ffi::IPLVector3 {
-    fn from(value: &glam::Vec3) -> Self {
-        Self {
-            x: value.x,
-            y: value.y,
-            z: value.z,
-        }
-    }
+    pub use crate::hrtf::{Hrtf, HrtfType};
 }

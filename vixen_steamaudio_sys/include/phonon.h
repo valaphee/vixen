@@ -1218,7 +1218,7 @@ typedef struct {
     IPLint32 numSpeakers;
 
     /** Array of unit-length directions for each speaker. Only for IPL_SPEAKERLAYOUTTYPE_CUSTOM. */
-    IPLVector3* speakers;
+    const IPLVector3* speakers;
 } IPLSpeakerLayout;
 
 /** Global settings for audio signal processing. */

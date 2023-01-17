@@ -1,7 +1,7 @@
+use crate::error::check;
 use crate::ffi;
 use crate::prelude::*;
 use std::ffi::CString;
-use crate::error::check;
 
 pub struct Hrtf {
     pub(crate) inner: ffi::IPLHRTF,
@@ -18,22 +18,26 @@ impl Hrtf {
             samplingRate: sample_rate as i32,
             frameSize: frame_length as i32,
         };
-        let mut hrtf: ffi::IPLHRTF = unsafe { std::mem::zeroed() };
+        let mut hrtf = std::ptr::null_mut();
 
         unsafe {
-            check(ffi::iplHRTFCreate(
-                context.inner,
-                &mut audio_settings,
-                &mut hrtf_type.into(),
-                &mut hrtf,
-            ), ())?;
+            check(
+                ffi::iplHRTFCreate(
+                    context.inner,
+                    &mut audio_settings,
+                    &mut hrtf_type.into(),
+                    &mut hrtf,
+                ),
+                (),
+            )?;
         }
 
-        Ok(Self {
-            inner: hrtf,
-        })
+        Ok(Self { inner: hrtf })
     }
 }
+
+unsafe impl Sync for Hrtf {}
+unsafe impl Send for Hrtf {}
 
 impl Clone for Hrtf {
     fn clone(&self) -> Self {
@@ -41,9 +45,7 @@ impl Clone for Hrtf {
             ffi::iplHRTFRetain(self.inner);
         }
 
-        Hrtf {
-            inner: self.inner,
-        }
+        Self { inner: self.inner }
     }
 }
 
@@ -77,20 +79,6 @@ impl Into<ffi::IPLHRTFSettings> for HrtfType {
                 type_: ffi::IPLHRTFType_IPL_HRTFTYPE_SOFA,
                 sofaFileName: CString::new(path.clone()).unwrap().as_ptr(),
             },
-        }
-    }
-}
-
-pub enum HrtfInterpolation {
-    Nearest,
-    Bilinear,
-}
-
-impl Into<ffi::IPLHRTFInterpolation> for HrtfInterpolation {
-    fn into(self) -> ffi::IPLHRTFInterpolation {
-        match self {
-            Self::Nearest => ffi::IPLHRTFInterpolation_IPL_HRTFINTERPOLATION_NEAREST,
-            Self::Bilinear => ffi::IPLHRTFInterpolation_IPL_HRTFINTERPOLATION_BILINEAR,
         }
     }
 }
