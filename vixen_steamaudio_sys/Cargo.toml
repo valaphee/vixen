@@ -1,0 +1,16 @@
+[package]
+name = "vixen_steamaudio_sys"
+version = "0.0.1"
+edition = "2021"
+authors = ["Valaphee <iam@valaphee.com>"]
+license = "Apache-2.0"
+repository = "https://github.com/valaphee/vixen.git"
+description = "Steam Audio bindings"
+build = "build.rs"
+
+[dependencies]
+glam = "0.22"
+thiserror = "1.0"
+
+[build-dependencies]
+bindgen = "0.63"

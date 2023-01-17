@@ -1,0 +1,25 @@
+[package]
+name = "vixen_steamaudio"
+version = "0.0.1"
+edition = "2021"
+authors = ["Valaphee <iam@valaphee.com>"]
+license = "Apache-2.0"
+repository = "https://github.com/valaphee/vixen.git"
+description = "Steam Audio integration for Bevy."
+
+[dependencies]
+bevy = { version = "0.9", default-features = false, features = ["bevy_asset", "bevy_audio"] }
+
+[dev-dependencies]
+bevy = { version = "0.9", default-features = false, features = [
+    "bevy_asset",
+    "bevy_audio",
+    "bevy_core_pipeline",
+    "bevy_pbr",
+    "bevy_render",
+    "bevy_scene",
+    "bevy_winit",
+    "jpeg",
+    "x11"
+] }
+vixen_obj = { path = "../vixen_obj" }

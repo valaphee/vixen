@@ -1,0 +1,26 @@
+[package]
+name = "vixen_bis_asset"
+version = "0.0.1"
+edition = "2021"
+authors = ["Valaphee <iam@valaphee.com>"]
+license = "Apache-2.0"
+repository = "https://github.com/valaphee/vixen.git"
+description = "Bohemia asset support for Bevy."
+
+[dependencies]
+anyhow = "1.0"
+bevy = { version = "0.9", default-features = false, features = ["bevy_asset", "bevy_render"] }
+byteorder = "1.4"
+minilzo = "0.2"
+thiserror = "1.0"
+
+[dev-dependencies]
+bevy = { version = "0.9", default-features = false, features = [
+    "bevy_asset",
+    "bevy_core_pipeline",
+    "bevy_pbr",
+    "bevy_render",
+    "bevy_scene",
+    "bevy_winit",
+    "x11"
+] }

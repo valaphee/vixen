@@ -1,7 +1,12 @@
 [workspace]
 members = [
-    "bevyv_bis_asset",
-    "bevyv_cas",
-    "bevyv_obj"
+    "vixen_bis_asset",
+    "vixen_cas",
+    "vixen_obj",
+    "vixen_steamaudio",
+    "vixen_steamaudio_sys"
 ]
 resolver = "2"
+
+[patch.crates-io]
+bevy = { version = "0.9", path = "../bevy" }
