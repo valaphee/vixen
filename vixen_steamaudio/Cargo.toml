@@ -11,10 +11,10 @@ description = ""
 anyhow = "1.0"
 bevy = { version = "0.9", default-features = false, features = ["bevy_asset", "bevy_audio"] }
 rodio = { version = "0.16", default-features = false }
-steamaudio = "0.0"
+steamaudio = { version = "0.0", features = ["rodio"] }
 
 [dev-dependencies]
-bevy = { version = "0.9.1", default-features = false, features = [
+bevy = { version = "0.9", default-features = false, features = [
     "bevy_animation",
     "bevy_asset",
     "bevy_audio",
@@ -23,6 +23,6 @@ bevy = { version = "0.9.1", default-features = false, features = [
     "bevy_render",
     "bevy_scene",
     "bevy_winit",
-    "mp3",
+    "vorbis",
     "x11"
 ] }

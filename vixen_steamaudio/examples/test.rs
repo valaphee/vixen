@@ -2,12 +2,15 @@ use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 use bevy::window::CursorGrabMode;
 use std::f32::consts::{FRAC_PI_2, PI};
-use vixen_steamaudio::{Listener, SoundBundle, SteamAudioPlugin};
+use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
+use vixen_steamaudio::{Listener, SoundBundle, AudioPlugin};
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugin(SteamAudioPlugin)
+        .add_plugin(AudioPlugin)
+        .add_plugin(FrameTimeDiagnosticsPlugin::default())
+        .add_plugin(LogDiagnosticsPlugin::default())
         .add_startup_system(setup)
         .add_system(grab_mouse)
         .add_system(process_input)
@@ -45,11 +48,11 @@ fn setup(
         ..default()
     });
 
-    let planet = Name::new("planet");
+    let animation_marker = Name::new("marker");
     let mut animation = AnimationClip::default();
     animation.add_curve_to_path(
         EntityPath {
-            parts: vec![planet.clone()],
+            parts: vec![animation_marker.clone()],
         },
         VariableCurve {
             keyframe_timestamps: vec![0.0, 1.0, 2.0, 3.0, 4.0],
@@ -63,18 +66,17 @@ fn setup(
         },
     );
 
-    let mut player = AnimationPlayer::default();
-    player.play(animations.add(animation)).repeat();
+    let mut animation_player = AnimationPlayer::default();
+    animation_player.play(animations.add(animation)).repeat();
+
     commands.spawn((
         SoundBundle {
-            sound: asset_server.load("/home/valaphee/Downloads/Eiffel.mp3"),
+            sound: asset_server.load("Windless Slopes.ogg"),
             transform: Transform::from_xyz(1.0, 0.0, 0.0),
         },
-        planet,
-        player,
-        meshes.add(Mesh::from(shape::Cube {
-            size: 5.0,
-        })),
+        animation_marker,
+        animation_player,
+        meshes.add(Mesh::from(shape::Cube { size: 5.0 })),
         materials.add(Color::rgb(0.8, 0.0, 0.6).into()),
         GlobalTransform::default(),
         Visibility::default(),
@@ -86,25 +88,29 @@ fn setup(
 #[derive(Component)]
 pub struct Freecam;
 
-pub fn grab_mouse(
-    mut windows: ResMut<Windows>,
-    mouse_input: Res<Input<MouseButton>>,
-    keyboard_input: Res<Input<KeyCode>>,
+fn grab_mouse(
+    mut windows: Query<&mut Window>,
+    mouse: Res<Input<MouseButton>>,
+    key: Res<Input<KeyCode>>,
 ) {
-    let window = windows.primary_mut();
-    if mouse_input.just_pressed(MouseButton::Left) {
-        window.set_cursor_visibility(false);
-        window.set_cursor_grab_mode(CursorGrabMode::Locked);
-    }
-    if keyboard_input.just_pressed(KeyCode::Escape) {
-        window.set_cursor_visibility(true);
-        window.set_cursor_grab_mode(CursorGrabMode::None);
+    if !windows.is_empty() {
+        let mut window = windows.single_mut();
+
+        if mouse.just_pressed(MouseButton::Left) {
+            window.cursor.visible = false;
+            window.cursor.grab_mode = CursorGrabMode::Locked;
+        }
+
+        if key.just_pressed(KeyCode::Escape) {
+            window.cursor.visible = true;
+            window.cursor.grab_mode = CursorGrabMode::None;
+        }
     }
 }
 
 pub fn process_input(
     time: Res<Time>,
-    windows: Res<Windows>,
+    mut windows: Query<&Window>,
     keyboard_input: Res<Input<KeyCode>>,
     /*mouse_button_input: Res<Input<MouseButton>>,*/
     mut mouse_motion_event_reader: EventReader<MouseMotion>,
@@ -113,9 +119,11 @@ pub fn process_input(
     mut query: Query<&mut Transform, With<Freecam>>,
 ) {
     let mut mouse_delta: Vec2 = Vec2::ZERO;
-    if !windows.get_primary().unwrap().cursor_visible() {
-        for event in mouse_motion_event_reader.iter() {
-            mouse_delta += event.delta;
+    if !windows.is_empty() {
+        if !windows.single_mut().cursor.visible {
+            for event in mouse_motion_event_reader.iter() {
+                mouse_delta += event.delta;
+            }
         }
     }
 
