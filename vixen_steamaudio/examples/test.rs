@@ -1,9 +1,9 @@
+use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 use bevy::window::CursorGrabMode;
 use std::f32::consts::{FRAC_PI_2, PI};
-use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
-use vixen_steamaudio::{Listener, SoundBundle, AudioPlugin};
+use vixen_steamaudio::{AudioPlugin, Listener, SoundBundle};
 
 fn main() {
     App::new()
@@ -26,7 +26,7 @@ fn setup(
 ) {
     commands.spawn((
         Camera3dBundle {
-            transform: Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
+            transform: Transform::from_xyz(-2.0, 2.5, 5.0)/*.looking_at(Vec3::ZERO, Vec3::Y)*/,
             ..default()
         },
         Freecam,
@@ -71,7 +71,7 @@ fn setup(
 
     commands.spawn((
         SoundBundle {
-            sound: asset_server.load("Windless Slopes.ogg"),
+            source: asset_server.load("Windless Slopes.ogg"),
             transform: Transform::from_xyz(1.0, 0.0, 0.0),
         },
         animation_marker,
