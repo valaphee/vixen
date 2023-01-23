@@ -1,0 +1,28 @@
+[package]
+name = "vixen_steamaudio"
+version = "0.0.1"
+edition = "2021"
+authors = ["Valaphee <iam@valaphee.com>"]
+license = "Apache-2.0"
+repository = "https://github.com/valaphee/vixen.git"
+description = ""
+
+[dependencies]
+anyhow = "1.0"
+bevy = { version = "0.9", default-features = false, features = ["bevy_asset", "bevy_audio"] }
+rodio = { version = "0.16", default-features = false }
+steamaudio = "0.0"
+
+[dev-dependencies]
+bevy = { version = "0.9.1", default-features = false, features = [
+    "bevy_animation",
+    "bevy_asset",
+    "bevy_audio",
+    "bevy_core_pipeline",
+    "bevy_pbr",
+    "bevy_render",
+    "bevy_scene",
+    "bevy_winit",
+    "mp3",
+    "x11"
+] }

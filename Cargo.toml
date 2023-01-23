@@ -2,9 +2,11 @@
 members = [
     "vixen_bis_asset",
     "vixen_cas",
-    "vixen_obj"
+    "vixen_obj",
+    "vixen_steamaudio"
 ]
 resolver = "2"
 
 [patch.crates-io]
 bevy = { version = "0.9", path = "../bevy" }
+steamaudio = { path = "../steamaudio" }
