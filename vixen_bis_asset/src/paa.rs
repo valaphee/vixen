@@ -144,10 +144,9 @@ enum PaaTag {
 
 impl PaaTag {
     fn read_from<R: Read>(input: &mut R) -> Result<PaaTag> {
-        let mut name_bytes = Vec::new();
-        name_bytes.resize(8, 0);
+        let mut name_bytes = [0u8; 8];
         input.read_exact(&mut name_bytes)?;
-        let name: String = name_bytes.iter().rev().map(|byte| *byte as char).collect();
+        let name: String = name_bytes.iter().rev().map(|&byte| byte as char).collect();
         let length = input.read_u32::<LittleEndian>()?;
 
         Ok(match name.as_str() {

@@ -82,7 +82,7 @@ impl Plugin for AudioPlugin {
 pub struct Listener;
 
 #[derive(Component)]
-pub struct AirAbsorption ;
+pub struct AirAbsorption;
 
 #[derive(Bundle)]
 pub struct SoundBundle {
@@ -133,8 +133,10 @@ fn update_sounds(
 
             let sound = Sound {
                 args: Arc::new(Mutex::new(SoundArgs {
-                    simulation_source: steamaudio::simulation::Source::new(&audio_resources.simulator)
-                        .unwrap(),
+                    simulation_source: steamaudio::simulation::Source::new(
+                        &audio_resources.simulator,
+                    )
+                    .unwrap(),
                     position: transform.translation,
                 })),
             };
@@ -164,7 +166,11 @@ fn update_sounds(
                     steamaudio::transform::transform(
                         audio_source,
                         move |in_, out| {
-                            direct_effect.apply(&sound_args.lock().unwrap().simulation_source, in_, out);
+                            direct_effect.apply(
+                                &sound_args.lock().unwrap().simulation_source,
+                                in_,
+                                out,
+                            );
                         },
                         audio_source_channels,
                         512,

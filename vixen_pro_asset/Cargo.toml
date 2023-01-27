@@ -1,0 +1,27 @@
+[package]
+name = "vixen_pro_asset"
+version = "0.0.1"
+edition = "2021"
+authors = ["Valaphee <iam@valaphee.com>"]
+license = "Apache-2.0"
+repository = "https://github.com/valaphee/vixen.git"
+description = "Prometheus asset support for Bevy."
+
+[dependencies]
+anyhow = "1.0"
+bevy = { version = "0.9", default-features = false, features = ["bevy_asset", "bevy_render"] }
+byteorder = "1.4"
+fasthash = "0.4"
+md-5 = "0.10.5"
+thiserror = "1.0"
+
+[dev-dependencies]
+bevy = { version = "0.9", default-features = false, features = [
+    "bevy_asset",
+    "bevy_core_pipeline",
+    "bevy_pbr",
+    "bevy_render",
+    "bevy_scene",
+    "bevy_winit",
+    "x11"
+] }

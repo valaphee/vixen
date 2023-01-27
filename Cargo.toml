@@ -1,9 +1,11 @@
 [workspace]
 members = [
-    "vixen_bis_asset",
     "vixen_cas",
     "vixen_obj",
-    "vixen_steamaudio"
+    "vixen_steamaudio",
+
+    "vixen_bis_asset",
+    "vixen_pro_asset"
 ]
 resolver = "2"
 
