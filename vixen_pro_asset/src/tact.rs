@@ -1,8 +1,8 @@
-use std::collections::HashMap;
-use std::io::Read;
 use anyhow::{bail, Result};
 use byteorder::{BigEndian, ReadBytesExt};
 use md5::{Digest, Md5};
+use std::collections::HashMap;
+use std::io::Read;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -16,13 +16,13 @@ enum TactError {
 }
 
 #[derive(Debug)]
-pub struct Encoding {
-    pub c_to_e_keys: HashMap<Vec<u8>, EncodingCToEKey>,
-    pub e_key_specs: HashMap<Vec<u8>, EncodingEKeySpec>,
+struct Encoding {
+    c_to_e_keys: HashMap<Vec<u8>, EncodingCToEKey>,
+    e_key_specs: HashMap<Vec<u8>, EncodingEKeySpec>,
 }
 
 impl Encoding {
-    pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut R) -> Result<Self> {
         if input.read_u16::<BigEndian>()? /* EN */ != 0x454E {
             bail!(TactError::InvalidMagic);
         }
@@ -51,7 +51,6 @@ impl Encoding {
         for _ in 0..c_to_e_key_page_count {
             c_to_e_key_page_table.push(EncodingPage::read_from(input, c_key_size)?);
         }
-
         let mut c_to_e_keys = HashMap::new();
         for c_to_e_key_page in &mut c_to_e_key_page_table {
             let mut c_to_e_key_page_data = vec![0; c_to_e_key_page_size as usize * 1024];
@@ -62,7 +61,9 @@ impl Encoding {
                 bail!(TactError::ChecksumMismatch);
             }
             let mut c_to_e_key_page_data = c_to_e_key_page_data.as_slice();
-            while let Ok(c_to_e_key) = EncodingCToEKey::read_from(&mut c_to_e_key_page_data, c_key_size, e_key_size) {
+            while let Ok(c_to_e_key) =
+                EncodingCToEKey::read_from(&mut c_to_e_key_page_data, c_key_size, e_key_size)
+            {
                 c_to_e_keys.insert(c_to_e_key.c_key.clone(), c_to_e_key);
             }
         }
@@ -71,7 +72,6 @@ impl Encoding {
         for _ in 0..e_key_spec_page_count {
             e_key_spec_page_table.push(EncodingPage::read_from(input, e_key_size)?);
         }
-
         let mut e_key_specs = HashMap::new();
         for e_key_spec_page in &mut e_key_spec_page_table {
             let mut e_key_spec_page_data = vec![0; e_key_spec_page_size as usize * 1024];
@@ -82,7 +82,9 @@ impl Encoding {
                 bail!(TactError::ChecksumMismatch);
             }
             let mut e_key_spec_page_data = e_key_spec_page_data.as_slice();
-            while let Ok(e_key_spec) = EncodingEKeySpec::read_from(&mut e_key_spec_page_data, e_key_size, &e_specs) {
+            while let Ok(e_key_spec) =
+                EncodingEKeySpec::read_from(&mut e_key_spec_page_data, e_key_size, &e_specs)
+            {
                 e_key_specs.insert(e_key_spec.e_key.clone(), e_key_spec);
             }
         }
@@ -117,10 +119,10 @@ impl EncodingPage {
 }
 
 #[derive(Debug)]
-pub struct EncodingCToEKey {
+struct EncodingCToEKey {
     c_key: Vec<u8>,
-    pub c_size: u64,
-    pub e_keys: Vec<Vec<u8>>,
+    c_size: u64,
+    e_keys: Vec<Vec<u8>>,
 }
 
 impl EncodingCToEKey {
@@ -145,10 +147,10 @@ impl EncodingCToEKey {
 }
 
 #[derive(Debug)]
-pub struct EncodingEKeySpec {
+struct EncodingEKeySpec {
     e_key: Vec<u8>,
-    pub e_size: u64,
-    pub e_spec: String,
+    e_size: u64,
+    e_spec: String,
 }
 
 impl EncodingEKeySpec {
@@ -159,7 +161,10 @@ impl EncodingEKeySpec {
                 input.read_exact(&mut e_key)?;
                 e_key
             },
-            e_spec: e_specs.get(input.read_u32::<BigEndian>()? as usize).unwrap_or(&"".to_string()).clone(),
+            e_spec: e_specs
+                .get(input.read_u32::<BigEndian>()? as usize)
+                .unwrap_or(&"".to_string())
+                .clone(),
             e_size: input.read_uint::<BigEndian>(5)?,
         })
     }

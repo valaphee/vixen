@@ -1,12 +1,13 @@
-use std::io::Read;
-use aes::cipher::{BlockDecryptMut, KeyIvInit};
 use aes::cipher::block_padding::NoPadding;
+use aes::cipher::{BlockDecryptMut, KeyIvInit};
 use anyhow::Result;
 use byteorder::{LittleEndian, ReadBytesExt};
 use sha1::{Digest, Sha1};
+use std::io::Read;
+use std::ops::Rem;
 
 #[derive(Debug)]
-pub struct ContentManifest {
+struct ContentManifest {
     build_version: u32,
     unknown_04: u32,
     unknown_08: u32,
@@ -14,14 +15,14 @@ pub struct ContentManifest {
     unknown_10: u32,
     unknown_14: u32,
     unknown_18: u32,
-    data_patch_record_count: u32,
-    pub data: Vec<ContentManifestData>,
+    asset_patch_record_count: u32,
     entry_patch_record_count: u32,
-    pub entries: Vec<ContentManifestEntry>
+    assets: Vec<ContentManifestAsset>,
+    entries: Vec<ContentManifestEntry>,
 }
 
 impl ContentManifest {
-    pub fn read_from(mut input: &[u8], fileid: String) -> Result<Self> {
+    fn read_from(mut input: &[u8], fileid: String) -> Result<Self> {
         let build_version = input.read_u32::<LittleEndian>()?;
         let unknown_04 = input.read_u32::<LittleEndian>()?;
         let unknown_08 = input.read_u32::<LittleEndian>()?;
@@ -29,47 +30,53 @@ impl ContentManifest {
         let unknown_10 = input.read_u32::<LittleEndian>()?;
         let unknown_14 = input.read_u32::<LittleEndian>()?;
         let unknown_18 = input.read_u32::<LittleEndian>()?;
-        let data_patch_record_count = input.read_u32::<LittleEndian>()?;
-        let data_count = input.read_u32::<LittleEndian>()?;
+        let asset_patch_record_count = input.read_u32::<LittleEndian>()?;
+        let asset_count = input.read_u32::<LittleEndian>()?;
         let entry_patch_record_count = input.read_u32::<LittleEndian>()?;
         let entry_count = input.read_u32::<LittleEndian>()?;
-        if input.read_u32::<LittleEndian>()? >> 8 /* cmf */ != 0x636D66 {}
 
-        if build_version != 109168 {}
-        let mut fileid_sha1 = Sha1::new();
-        fileid_sha1.update(fileid);
-        let fileid_sha1 = fileid_sha1.finalize();
-        let key = unsafe {
-            let mut buffer = [0u8; 0x20];
-            let mut kidx = buffer.len() as u32 * build_version;
-            let mut okidx = kidx;
-            for i in 0..buffer.len() {
-                buffer[i] = KEYTABLE[kidx.rem_euclid(0x200) as usize];
-                kidx = build_version.unchecked_sub(kidx);
-            }
-            buffer
+        if input.read_u32::<LittleEndian>()? >> 8 /* cmf */ != 0x636D66 {}
+        let input = {
+            if build_version != 109168 {}
+            let mut fileid_sha1 = Sha1::new();
+            fileid_sha1.update(fileid);
+            let fileid_sha1 = fileid_sha1.finalize();
+            let key = {
+                let mut buffer = [0u8; 0x20];
+                let mut kidx = buffer.len() as u32 * build_version;
+                let mut okidx = kidx;
+                for i in 0..buffer.len() {
+                    buffer[i] = KEYTABLE[(kidx % 0x200) as usize];
+                    kidx = build_version.wrapping_sub(kidx);
+                }
+                buffer
+            };
+            let iv = {
+                let mut buffer = [0u8; 16];
+                let mut kidx = KEYTABLE[(build_version & 0x1FF) as usize] as u32;
+                let mut okidx = kidx;
+                for i in 0..buffer.len() {
+                    buffer[i] = KEYTABLE[(kidx % 0x200) as usize];
+                    kidx = kidx.wrapping_add(build_version.wrapping_mul(asset_count) % 7);
+                    buffer[i] ^= fileid_sha1
+                        [kidx.wrapping_sub(73).rem_euclid(fileid_sha1.len() as u32) as usize]
+                }
+                buffer
+            };
+            Aes256CbcDec::new_from_slices(&key, &iv)
+                .unwrap()
+                .decrypt_padded_vec_mut::<NoPadding>(input)
+                .unwrap()
         };
-        let iv = unsafe {
-            let mut buffer = [0u8; 16];
-            let mut kidx = KEYTABLE[(build_version & 0x1FF) as usize] as u32;
-            let mut okidx = kidx;
-            for i in 0..buffer.len() {
-                buffer[i] = KEYTABLE[kidx.rem_euclid(0x200) as usize];
-                kidx = kidx.unchecked_add(build_version.unchecked_mul(data_count) % 7);
-                buffer[i] ^= fileid_sha1[kidx.unchecked_sub(73).rem_euclid(fileid_sha1.len() as u32) as usize]
-            }
-            buffer
-        };
-        let input = Aes256CbcDec::new_from_slices(&key, &iv).unwrap().decrypt_padded_vec_mut::<NoPadding>(input).unwrap();
         let mut input = input.as_slice();
 
         let mut entries = Vec::with_capacity(entry_count as usize);
         for _ in 0..entry_count {
             entries.push(ContentManifestEntry::read_from(&mut input)?);
         }
-        let mut data = Vec::with_capacity(entry_count as usize);
-        for _ in 0..data_count {
-            data.push(ContentManifestData::read_from(&mut input)?);
+        let mut assets = Vec::with_capacity(entry_count as usize);
+        for _ in 0..asset_count {
+            assets.push(ContentManifestAsset::read_from(&mut input)?);
         }
 
         Ok(ContentManifest {
@@ -80,8 +87,8 @@ impl ContentManifest {
             unknown_10,
             unknown_14,
             unknown_18,
-            data_patch_record_count,
-            data,
+            asset_patch_record_count,
+            assets,
             entry_patch_record_count,
             entries,
         })
@@ -89,10 +96,10 @@ impl ContentManifest {
 }
 
 #[derive(Debug)]
-pub struct ContentManifestEntry {
-    pub index: u32,
-    pub hash_a: u64,
-    pub hash_b: u64
+struct ContentManifestEntry {
+    index: u32,
+    hash_a: u64,
+    hash_b: u64,
 }
 
 impl ContentManifestEntry {
@@ -106,24 +113,24 @@ impl ContentManifestEntry {
 }
 
 #[derive(Debug)]
-pub struct ContentManifestData {
-    pub guid: u64,
-    pub size: u32,
+struct ContentManifestAsset {
+    guid: u64,
+    size: u32,
     unknown_0c: u8,
-    pub c_key: [u8; 0x10],
+    md5: [u8; 0x10],
 }
 
-impl ContentManifestData {
+impl ContentManifestAsset {
     fn read_from<R: Read>(input: &mut R) -> Result<Self> {
-        Ok(ContentManifestData {
+        Ok(ContentManifestAsset {
             guid: input.read_u64::<LittleEndian>()?,
             size: input.read_u32::<LittleEndian>()?,
             unknown_0c: input.read_u8()?,
-            c_key: {
-                let mut c_key = [0; 0x10];
-                input.read_exact(&mut c_key)?;
-                c_key
-            }
+            md5: {
+                let mut md5 = [0; 0x10];
+                input.read_exact(&mut md5)?;
+                md5
+            },
         })
     }
 }
@@ -136,19 +143,17 @@ struct ResourceGraph {
     unknown_0c: u32,
     unknown_10: u32,
     unknown_14: u32,
-    package_count: u32,
-    package_block_size: u32,
-    skin_count: u32,
-    skin_block_size: u32,
     type_bundle_index_count: u32,
     type_bundle_index_block_size: u32,
     unknown_30: u32,
     unknown_34: u32,
-    graph_block_size: u32
+    graph_block_size: u32,
+    packages: Vec<ResourceGraphPackage>,
+    skins: Vec<ResourceGraphSkin>,
 }
 
 impl ResourceGraph {
-    pub fn read_from(mut input: &[u8], fileid: String) -> Result<Self> {
+    fn read_from(mut input: &[u8], fileid: String) -> Result<Self> {
         let unknown_00 = input.read_u32::<LittleEndian>()?;
         let build_version = input.read_u32::<LittleEndian>()?;
         let unknown_08 = input.read_u32::<LittleEndian>()?;
@@ -164,34 +169,40 @@ impl ResourceGraph {
         let unknown_30 = input.read_u32::<LittleEndian>()?;
         let unknown_34 = input.read_u32::<LittleEndian>()?;
         let graph_block_size = input.read_u32::<LittleEndian>()?;
-        if input.read_u32::<LittleEndian>()? >> 8 /* trg */ != 0x677274 {}
 
-        if build_version != 109168 {}
-        let mut fileid_sha1 = Sha1::new();
-        fileid_sha1.update(fileid);
-        let fileid_sha1 = fileid_sha1.finalize();
-        let key = unsafe {
-            let mut buffer = [0u8; 0x20];
-            let mut kidx = buffer.len() as u32 * build_version;
-            let mut okidx = kidx;
-            for i in 0..buffer.len() {
-                buffer[i] = KEYTABLE[kidx.rem_euclid(0x200) as usize];
-                kidx = build_version.unchecked_sub(kidx);
-            }
-            buffer
+        if input.read_u32::<LittleEndian>()? >> 8 /* trg */ != 0x677274 {}
+        let input = {
+            if build_version != 109168 {}
+            let mut fileid_sha1 = Sha1::new();
+            fileid_sha1.update(fileid);
+            let fileid_sha1 = fileid_sha1.finalize();
+            let key = {
+                let mut buffer = [0u8; 0x20];
+                let mut kidx = buffer.len() as u32 * build_version;
+                let mut okidx = kidx;
+                for i in 0..buffer.len() {
+                    buffer[i] = KEYTABLE[(kidx % 0x200) as usize];
+                    kidx = build_version.wrapping_sub(kidx);
+                }
+                buffer
+            };
+            let iv = {
+                let mut buffer = [0u8; 16];
+                let mut kidx = KEYTABLE[(build_version & 0x1FF) as usize] as u32;
+                let mut okidx = kidx;
+                for i in 0..buffer.len() {
+                    buffer[i] = KEYTABLE[(kidx % 0x200) as usize];
+                    kidx = kidx.wrapping_add(build_version.wrapping_mul(skin_count) % 7);
+                    buffer[i] ^=
+                        fileid_sha1[(kidx.wrapping_sub(73) % fileid_sha1.len() as u32) as usize]
+                }
+                buffer
+            };
+            Aes256CbcDec::new_from_slices(&key, &iv)
+                .unwrap()
+                .decrypt_padded_vec_mut::<NoPadding>(input)
+                .unwrap()
         };
-        let iv = unsafe {
-            let mut buffer = [0u8; 16];
-            let mut kidx = KEYTABLE[(build_version & 0x1FF) as usize] as u32;
-            let mut okidx = kidx;
-            for i in 0..buffer.len() {
-                buffer[i] = KEYTABLE[kidx.rem_euclid(0x200) as usize];
-                kidx = kidx.unchecked_add(build_version.unchecked_mul(skin_count) % 7);
-                buffer[i] ^= fileid_sha1[kidx.unchecked_sub(73).rem_euclid(fileid_sha1.len() as u32) as usize]
-            }
-            buffer
-        };
-        let input = Aes256CbcDec::new_from_slices(&key, &iv).unwrap().decrypt_padded_vec_mut::<NoPadding>(input).unwrap();
         let mut input = input.as_slice();
 
         let mut packages = Vec::with_capacity(package_count as usize);
@@ -210,21 +221,19 @@ impl ResourceGraph {
             unknown_0c,
             unknown_10,
             unknown_14,
-            package_count,
-            package_block_size,
-            skin_count,
-            skin_block_size,
             type_bundle_index_count,
             type_bundle_index_block_size,
             unknown_30,
             unknown_34,
             graph_block_size,
+            packages,
+            skins,
         })
     }
 }
 
 #[derive(Debug)]
-pub struct ResourceGraphPackage {
+struct ResourceGraphPackage {
     asset_guid: u64,
     resource_key_id: u64,
     unknown_10: u32,
@@ -247,7 +256,7 @@ impl ResourceGraphPackage {
 }
 
 #[derive(Debug)]
-pub struct ResourceGraphSkin {
+struct ResourceGraphSkin {
     asset_ptr: u64,
     skin_guid: u64,
     unknown_10: u32,
@@ -256,7 +265,7 @@ pub struct ResourceGraphSkin {
     unknown_1c: u32,
     unknown_20: u32,
     unknown_26: u16,
-    assets: Vec<ResourceGraphSkinAsset>
+    assets: Vec<ResourceGraphSkinAsset>,
 }
 
 impl ResourceGraphSkin {
@@ -271,8 +280,8 @@ impl ResourceGraphSkin {
         let asset_count = input.read_u16::<LittleEndian>()?;
         let unknown_26 = input.read_u16::<LittleEndian>()?;
         let mut assets = Vec::with_capacity(asset_count as usize);
-        for _ in 0..skin_count {
-            skins.push(ResourceGraphSkinAsset::read_from(input)?);
+        for _ in 0..asset_count {
+            assets.push(ResourceGraphSkinAsset::read_from(input)?);
         }
 
         Ok(Self {
@@ -290,12 +299,12 @@ impl ResourceGraphSkin {
 }
 
 #[derive(Debug)]
-pub struct ResourceGraphSkinAsset {
+struct ResourceGraphSkinAsset {
     source_asset: u64,
     dest_asset: u64,
     unknown_10: u64,
     unknown_18: u32,
-    unknown_1c: u32
+    unknown_1c: u32,
 }
 
 impl ResourceGraphSkinAsset {
@@ -345,5 +354,5 @@ static KEYTABLE: &'static [u8] = &[
     0x6B, 0xC0, 0x0B, 0xDE, 0x0B, 0x03, 0x76, 0x5D, 0x01, 0xF9, 0x9D, 0x77, 0x20, 0xDA, 0x36, 0x87,
     0x6E, 0xDE, 0x9E, 0x35, 0xE3, 0xAD, 0xEE, 0x8E, 0x22, 0xD2, 0xB4, 0x44, 0xDB, 0x46, 0x73, 0xFB,
     0x17, 0x51, 0x69, 0x9D, 0xDF, 0x20, 0x64, 0xBC, 0xD1, 0x54, 0x69, 0xA4, 0x6B, 0x8F, 0xA4, 0xDB,
-    0x0D, 0x35, 0xAE, 0x5C, 0xF2, 0x35, 0x19, 0x9A, 0xE4, 0xA9, 0x61, 0xDB, 0x04, 0xEB, 0x06, 0xD2
+    0x0D, 0x35, 0xAE, 0x5C, 0xF2, 0x35, 0x19, 0x9A, 0xE4, 0xA9, 0x61, 0xDB, 0x04, 0xEB, 0x06, 0xD2,
 ];

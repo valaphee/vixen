@@ -1,12 +1,12 @@
-use std::io::Read;
 use anyhow::{bail, Result};
 use byteorder::{BigEndian, ReadBytesExt};
 use flate2::read::ZlibDecoder;
 use md5::{Digest, Md5};
+use std::io::Read;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum BlteError {
+enum BlteError {
     #[error("invalid magic")]
     InvalidMagic,
     #[error("invalid size")]
@@ -17,10 +17,10 @@ pub enum BlteError {
     ChecksumMismatch,
 }
 
-pub struct Blte;
+struct Blte;
 
 impl Blte {
-    pub fn read_from<R: Read>(input: &mut R) -> Result<Vec<u8>> {
+    fn read_from<R: Read>(input: &mut R) -> Result<Vec<u8>> {
         if input.read_u32::<BigEndian>().unwrap() /* BLTE */ != 0x424C5445 {
             bail!(BlteError::InvalidMagic);
         }
@@ -69,7 +69,7 @@ impl Blte {
 struct BlteChunk {
     encoded_size: u32,
     content_size: u32,
-    md5: [u8; 16]
+    md5: [u8; 16],
 }
 
 impl BlteChunk {

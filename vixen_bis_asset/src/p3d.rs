@@ -133,7 +133,9 @@ impl P3dm {
         let major_version = input.read_u32::<LittleEndian>()?;
         let minor_version = input.read_u32::<LittleEndian>()?;
         if major_version != 0x1C && minor_version != 0x101 {
-            bail!(P3dError::UnknownVersion(format!("{major_version}.{minor_version}")))
+            bail!(P3dError::UnknownVersion(format!(
+                "{major_version}.{minor_version}"
+            )))
         }
 
         let point_count = input.read_u32::<LittleEndian>()?;
@@ -250,99 +252,6 @@ impl P3dmTag {
                 input.read_exact(&mut data)?;
                 data
             },
-        })
-    }
-}
-
-struct Odol {
-    index: u32,
-    mem_lod_sphere: f32,
-    geo_lod_sphere: f32,
-    point_flags: [u32; 3],
-    offset: [f32; 3],
-    map_color: u32,
-    map_color_2: u32,
-    view_density: f32,
-    aabb_min: [f32; 3],
-    aabb_max: [f32; 3],
-    center_of_gravity: [f32; 3],
-    offset_2: [f32; 3],
-    cog_offset: [f32; 3],
-}
-
-impl Odol {
-    fn read_from<R: Read + Seek>(input: &mut R) -> Result<Self> {
-        if input.read_u32::<BigEndian>()? /* ODOL */ != 0x4F444F4C {
-            bail!(P3dError::InvalidMagic)
-        }
-        let version = input.read_u32::<LittleEndian>()?;
-        input.seek(SeekFrom::Current(5))?;
-        let lod_count = input.read_u32::<LittleEndian>()?;
-        let mut lod_resolutions = Vec::with_capacity(lod_count as usize);
-        for _ in 0..lod_count {
-            lod_resolutions.push(input.read_f32::<LittleEndian>()?);
-        }
-        let index = input.read_u32()?;
-        let mem_lod_sphere = input.read_f32()?;
-        let geo_lod_sphere = input.read_f32()?;
-        let point_flags: [_; 3] = core::array::from_fn(|_| input.read_u32::<LittleEndian>()?);
-        let offset: [_; 3] = core::array::from_fn(|_| input.read_f32::<LittleEndian>()?);
-        let map_color = input.read_u32::<LittleEndian>()?;
-        let map_color_2 = input.read_u32::<LittleEndian>()?;
-        let view_density = input.read_f32::<LittleEndian>()?;
-        let aabb_min: [_; 3] = core::array::from_fn(|_| input.read_f32::<LittleEndian>()?);
-        let aabb_max: [_; 3] = core::array::from_fn(|_| input.read_f32::<LittleEndian>()?);
-        let center_of_gravity: [_; 3] = core::array::from_fn(|_| input.read_f32::<LittleEndian>()?);
-        let offset_2: [_; 3] = core::array::from_fn(|_| input.read_f32::<LittleEndian>()?);
-        let cog_offset: [_; 3] = core::array::from_fn(|_| input.read_f32::<LittleEndian>()?);
-        input.seek(SeekFrom::Current(196 + 1))?;
-        let mut lod_start_addresses = Vec::with_capacity(lod_count as usize);
-        for _ in 0..lod_count {
-            lod_start_addresses.push(input.read_u32::<LittleEndian>()?);
-        }
-        let mut lod_end_addresses = Vec::with_capacity(lod_count as usize);
-        for _ in 0..lod_count {
-            lod_end_addresses.push(input.read_u32::<LittleEndian>()?);
-        }
-
-        Ok(Self {
-            index,
-            mem_lod_sphere,
-            geo_lod_sphere,
-            point_flags,
-            offset,
-            map_color,
-            map_color_2,
-            view_density,
-            aabb_min,
-            aabb_max,
-            center_of_gravity,
-            offset_2,
-            cog_offset,
-        })
-    }
-}
-
-struct OdolLod {
-
-}
-
-impl OdolLod {
-    fn read_from<R: Read + Seek>(input: &mut R) -> Result<Self> {
-        Ok(OdolLod {
-
-        })
-    }
-}
-
-struct OdolLodMaterial {
-
-}
-
-impl OdolLodMaterial {
-    fn read_from<R: Read + Seek>(input: &mut R) -> Result<Self> {
-        Ok(OdolLodMaterial {
-
         })
     }
 }

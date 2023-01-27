@@ -1,12 +1,11 @@
-use std::io::{Read, Seek, SeekFrom};
-
 use anyhow::{bail, Result};
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
 use fasthash::lookup3;
+use std::io::{Read, Seek, SeekFrom};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum CascError {
+enum CascError {
     #[error("invalid size")]
     InvalidSize,
     #[error("unknown block type")]
@@ -18,14 +17,14 @@ pub enum CascError {
 }
 
 #[derive(Debug)]
-pub struct Shmem {
-    pub data_path: String,
-    pub versions: Vec<u32>,
-    pub free_spaces: Vec<Data>,
+struct SharedMemory {
+    data_path: String,
+    versions: Vec<u32>,
+    free_spaces: Vec<Data>,
 }
 
-impl Shmem {
-    pub fn read_from<R: Read + Seek>(input: &mut R) -> Result<Self> {
+impl SharedMemory {
+    fn read_from<R: Read + Seek>(input: &mut R) -> Result<Self> {
         if input.read_u32::<LittleEndian>()? /* Header Type */ != 4 {
             bail!(CascError::UnknownBlockType)
         }
@@ -34,8 +33,8 @@ impl Shmem {
         input.read_exact(&mut path)?;
         let mut versions = Vec::with_capacity(0x10);
         for _ in 0..(header_size - input.stream_position()? as u32 - 0x10 * 4) / (4 * 2) {
-            let block_size = input.read_u32::<LittleEndian>()?;
-            let block_offset = input.read_u32::<LittleEndian>()?;
+            input.read_u32::<LittleEndian>()?;
+            input.read_u32::<LittleEndian>()?;
         }
         for _ in 0..0x10 {
             versions.push(input.read_u32::<LittleEndian>()?);
@@ -72,7 +71,7 @@ impl Shmem {
                     .position(|&value| value == b'\0')
                     .unwrap_or(path.len())],
             )?
-                .to_string(),
+            .to_string(),
             versions,
             free_spaces,
         })
@@ -80,18 +79,18 @@ impl Shmem {
 }
 
 #[derive(Debug)]
-pub struct Index {
-    pub bucket: u16,
-    pub entry_length_size: u8,
-    pub entry_location_size: u8,
-    pub entry_key_size: u8,
-    pub entry_segment_bits: u8,
-    pub limit: u64,
-    pub entries: Vec<Data>,
+struct Index {
+    bucket: u16,
+    entry_length_size: u8,
+    entry_location_size: u8,
+    entry_key_size: u8,
+    entry_segment_bits: u8,
+    limit: u64,
+    entries: Vec<Data>,
 }
 
 impl Index {
-    pub fn read_from<R: Read + Seek>(input: &mut R) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut R) -> Result<Self> {
         let mut header_data = vec![0; input.read_u32::<LittleEndian>()? as usize];
         let header_hash = input.read_u32::<LittleEndian>()?;
         input.read_exact(&mut header_data)?;
@@ -108,7 +107,7 @@ impl Index {
         let entry_key_size = header_data.read_u8()?;
         let entry_segment_bits = header_data.read_u8()?;
         let limit = header_data.read_u64::<LittleEndian>()?;
-        input.seek(SeekFrom::Current(0x8))?;
+        input.read_exact(&mut [0; 0x8])?;
 
         let mut entries_data = vec![0; input.read_u32::<LittleEndian>()? as usize];
         let entries_hash = input.read_u32::<LittleEndian>()?;
@@ -117,7 +116,8 @@ impl Index {
             bail!(CascError::ChecksumMismatch)
         }*/
         let mut entries_data = entries_data.as_slice();
-        let entries_count = entries_data.len() / (entry_length_size + entry_location_size + entry_key_size) as usize;
+        let entries_count = entries_data.len()
+            / (entry_length_size + entry_location_size + entry_key_size) as usize;
         let mut entries = Vec::with_capacity(entries_count);
         for _ in 0..entries_count {
             entries.push(Data::read_from(
@@ -142,15 +142,15 @@ impl Index {
 }
 
 #[derive(Debug)]
-pub struct Data {
-    pub key: Vec<u8>,
-    pub file: u64,
-    pub offset: u64,
-    pub length: u64,
+struct Data {
+    key: Vec<u8>,
+    file: u64,
+    offset: u64,
+    length: u64,
 }
 
 impl Data {
-    pub fn read_from<R: Read>(
+    fn read_from<R: Read>(
         input: &mut R,
         length_size: u8,
         location_size: u8,
@@ -180,35 +180,40 @@ impl Data {
         })
     }
 
-    pub fn read<R : Read + Seek>(
-        &self,
-        input: &mut R
-    ) -> Result<()> {
+    fn read<R: Read + Seek>(&self, input: &mut R) -> Result<()> {
         input.seek(SeekFrom::Start(self.offset))?;
         let mut key = [0; 0x10];
         input.read_exact(&mut key)?;
         if input.read_u32::<LittleEndian>()? != self.length as u32 {
             bail!(CascError::InvalidSize);
         }
-        let flags = input.read_u16::<LittleEndian>()?;
+        input.read_u16::<LittleEndian>()?;
         {
             let checksum_mark = input.stream_position()?;
             input.seek(SeekFrom::Start(self.offset))?;
             let mut checksum_data = vec![0; (checksum_mark - self.offset) as usize];
             input.read_exact(&mut checksum_data)?;
-            if input.read_u32::<LittleEndian>()? != lookup3::hash32_with_seed(checksum_data, 0x3D6BE971) {
+            if input.read_u32::<LittleEndian>()?
+                != lookup3::hash32_with_seed(checksum_data, 0x3D6BE971)
+            {
                 bail!(CascError::ChecksumMismatch)
             }
         }
         {
             let offset = ((self.offset & 0x3FFFFFFF) | (self.file & 3) << 30) as u32;
-            let checksum_offset = ((input.stream_position()? & 0x3FFFFFFF) | (self.file & 3) << 30) as u32;
+            let checksum_offset =
+                ((input.stream_position()? & 0x3FFFFFFF) | (self.file & 3) << 30) as u32;
             input.seek(SeekFrom::Start(self.offset))?;
             let mut hashed_data = [0u8; 4];
             for i in offset..checksum_offset {
                 hashed_data[(i & 3) as usize] ^= input.read_u8()?;
             }
-            let encoded_offset: [u8; 4] = unsafe { std::mem::transmute(OFFSET_ENCODE_TABLE[((checksum_offset + 4) & 0xF) as usize] ^ (checksum_offset + 4)) };
+            let encoded_offset: [u8; 4] = unsafe {
+                std::mem::transmute(
+                    OFFSET_ENCODE_TABLE[((checksum_offset + 4) & 0xF) as usize]
+                        ^ (checksum_offset + 4),
+                )
+            };
             let checksum: [_; 4] = core::array::from_fn(|i| {
                 let j = (i + checksum_offset as usize) & 3;
                 hashed_data[j] ^ encoded_offset[j]
@@ -224,6 +229,6 @@ impl Data {
 }
 
 static OFFSET_ENCODE_TABLE: &'static [u32] = &[
-    0x049396b8, 0x72a82a9b, 0xee626cca, 0x9917754f, 0x15de40b1, 0xf5a8a9b6, 0x421eac7e, 0xa9d55c9a,
-    0x317fd40c, 0x04faf80d, 0x3d6be971, 0x52933cfd, 0x27f64b7d, 0xc6f5c11b, 0xd5757e3a, 0x6c388745,
+    0x049396B8, 0x72A82A9B, 0xEE626CCA, 0x9917754F, 0x15DE40B1, 0xF5A8A9B6, 0x421EAC7E, 0xA9D55C9A,
+    0x317FD40C, 0x04FAF80D, 0x3D6BE971, 0x52933CFD, 0x27F64B7D, 0xC6F5C11B, 0xD5757E3A, 0x6C388745,
 ];
