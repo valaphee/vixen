@@ -6,30 +6,34 @@ use md5::{Digest, Md5};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-enum BlteError {
+pub enum BlteError {
     #[error("invalid magic")]
     InvalidMagic,
+    #[error("invalid size")]
+    InvalidSize,
     #[error("unknown encoding mode: {0}")]
     UnknownEncodingMode(char),
     #[error("checksum mismatch")]
     ChecksumMismatch,
 }
 
-#[derive(Debug)]
-pub struct Blte {
-    flags: u8,
-    pub content: Vec<u8>
-}
+pub struct Blte;
 
 impl Blte {
-    pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R) -> Result<Vec<u8>> {
         if input.read_u32::<BigEndian>().unwrap() /* BLTE */ != 0x424C5445 {
             bail!(BlteError::InvalidMagic);
         }
-        let size = input.read_u32::<BigEndian>().unwrap();
-        let flags = input.read_u8().unwrap();
-        let mut chunks = Vec::with_capacity(input.read_u24::<BigEndian>().unwrap() as usize);
-        for _ in 0..chunks.capacity() {
+        let header_size = input.read_u32::<BigEndian>().unwrap();
+        if input.read_u8().unwrap() != 0xF {
+            bail!(BlteError::InvalidMagic);
+        }
+        let chunk_count = input.read_u24::<BigEndian>().unwrap();
+        if header_size != 4 + 4 + 1 + 3 + chunk_count * (16 + 4 + 4) {
+            bail!(BlteError::InvalidSize);
+        }
+        let mut chunks = Vec::with_capacity(chunk_count as usize);
+        for _ in 0..chunk_count {
             chunks.push(BlteChunk::read_from(input)?);
         }
 
@@ -57,10 +61,7 @@ impl Blte {
             }
         }
 
-        Ok(Self {
-            flags,
-            content
-        })
+        Ok(content)
     }
 }
 

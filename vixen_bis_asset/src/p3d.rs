@@ -279,7 +279,7 @@ impl Odol {
         input.seek(SeekFrom::Current(5))?;
         let lod_count = input.read_u32::<LittleEndian>()?;
         let mut lod_resolutions = Vec::with_capacity(lod_count as usize);
-        for _ in 0..lod_resolutions.capacity() {
+        for _ in 0..lod_count {
             lod_resolutions.push(input.read_f32::<LittleEndian>()?);
         }
         let index = input.read_u32()?;
@@ -297,11 +297,11 @@ impl Odol {
         let cog_offset: [_; 3] = core::array::from_fn(|_| input.read_f32::<LittleEndian>()?);
         input.seek(SeekFrom::Current(196 + 1))?;
         let mut lod_start_addresses = Vec::with_capacity(lod_count as usize);
-        for _ in 0..lod_start_addresses.capacity() {
+        for _ in 0..lod_count {
             lod_start_addresses.push(input.read_u32::<LittleEndian>()?);
         }
         let mut lod_end_addresses = Vec::with_capacity(lod_count as usize);
-        for _ in 0..lod_end_addresses.capacity() {
+        for _ in 0..lod_count {
             lod_end_addresses.push(input.read_u32::<LittleEndian>()?);
         }
 

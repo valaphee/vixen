@@ -6,7 +6,9 @@ use fasthash::lookup3;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-enum CascError {
+pub enum CascError {
+    #[error("invalid size")]
+    InvalidSize,
     #[error("unknown block type")]
     UnknownBlockType,
     #[error("unknown version")]
@@ -16,27 +18,26 @@ enum CascError {
 }
 
 #[derive(Debug)]
-pub struct SharedMemory {
+pub struct Shmem {
     pub data_path: String,
     pub versions: Vec<u32>,
-    pub free_spaces: Vec<Entry>,
+    pub free_spaces: Vec<Data>,
 }
 
-impl SharedMemory {
+impl Shmem {
     pub fn read_from<R: Read + Seek>(input: &mut R) -> Result<Self> {
         if input.read_u32::<LittleEndian>()? /* Header Type */ != 4 {
             bail!(CascError::UnknownBlockType)
         }
         let header_size = input.read_u32::<LittleEndian>()?;
         let mut path = vec![0; 0x100];
-        path.resize(path.capacity(), 0);
         input.read_exact(&mut path)?;
         let mut versions = Vec::with_capacity(0x10);
-        for _ in 0..(header_size - input.stream_position()? as u32 - versions.capacity() as u32 * 4) / (4 * 2) {
+        for _ in 0..(header_size - input.stream_position()? as u32 - 0x10 * 4) / (4 * 2) {
             let block_size = input.read_u32::<LittleEndian>()?;
             let block_offset = input.read_u32::<LittleEndian>()?;
         }
-        for _ in 0..versions.capacity() {
+        for _ in 0..0x10 {
             versions.push(input.read_u32::<LittleEndian>()?);
         }
 
@@ -47,8 +48,8 @@ impl SharedMemory {
         let mut free_spaces = Vec::with_capacity(free_space_size as usize);
         input.seek(SeekFrom::Current(0x18))?;
         for _ in 0..free_space_size {
-            let length = Entry::read_from(input, 0, 5, 0, 30)?;
-            free_spaces.push(Entry {
+            let length = Data::read_from(input, 0, 5, 0, 30)?;
+            free_spaces.push(Data {
                 key: vec![],
                 file: 0,
                 offset: 0,
@@ -57,7 +58,7 @@ impl SharedMemory {
         }
         input.seek(SeekFrom::Current(((1090 - free_space_size) * 5) as i64))?;
         for index in 0..free_space_size {
-            let file_offset = Entry::read_from(input, 0, 5, 0, 30)?;
+            let file_offset = Data::read_from(input, 0, 5, 0, 30)?;
             let entry = &mut free_spaces[index as usize];
             entry.file = file_offset.file;
             entry.offset = file_offset.offset;
@@ -86,7 +87,7 @@ pub struct Index {
     pub entry_key_size: u8,
     pub entry_segment_bits: u8,
     pub limit: u64,
-    pub entries: Vec<Entry>,
+    pub entries: Vec<Data>,
 }
 
 impl Index {
@@ -116,9 +117,10 @@ impl Index {
             bail!(CascError::ChecksumMismatch)
         }*/
         let mut entries_data = entries_data.as_slice();
-        let mut entries = Vec::with_capacity(entries_data.len() / (entry_length_size + entry_location_size + entry_key_size) as usize);
-        for _ in 0..entries.capacity() {
-            entries.push(Entry::read_from(
+        let entries_count = entries_data.len() / (entry_length_size + entry_location_size + entry_key_size) as usize;
+        let mut entries = Vec::with_capacity(entries_count);
+        for _ in 0..entries_count {
+            entries.push(Data::read_from(
                 &mut entries_data,
                 entry_length_size,
                 entry_location_size,
@@ -140,14 +142,14 @@ impl Index {
 }
 
 #[derive(Debug)]
-pub struct Entry {
+pub struct Data {
     pub key: Vec<u8>,
     pub file: u64,
     pub offset: u64,
     pub length: u64,
 }
 
-impl Entry {
+impl Data {
     pub fn read_from<R: Read>(
         input: &mut R,
         length_size: u8,
@@ -185,7 +187,9 @@ impl Entry {
         input.seek(SeekFrom::Start(self.offset))?;
         let mut key = [0; 0x10];
         input.read_exact(&mut key)?;
-        if input.read_u32::<LittleEndian>()? != self.length as u32 {}
+        if input.read_u32::<LittleEndian>()? != self.length as u32 {
+            bail!(CascError::InvalidSize);
+        }
         let flags = input.read_u16::<LittleEndian>()?;
         {
             let checksum_mark = input.stream_position()?;

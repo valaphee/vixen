@@ -8,13 +8,16 @@ repository = "https://github.com/valaphee/vixen.git"
 description = "Prometheus asset support for Bevy."
 
 [dependencies]
+aes = "0.8.2"
 anyhow = "1.0"
 bevy = { version = "0.9", default-features = false, features = ["bevy_asset", "bevy_render"] }
 byteorder = "1.4"
+cbc = { version = "0.1.2", features = ["alloc"] }
 fasthash = "0.4"
 flate2 = "1.0.25"
 hex = "0.4.3"
 md-5 = "0.10.5"
+sha1 = "0.10.5"
 thiserror = "1.0"
 
 [dev-dependencies]
