@@ -1,0 +1,25 @@
+[package]
+name = "ngdp"
+version = "0.0.1"
+edition = "2021"
+authors = ["Valaphee <iam@valaphee.com>"]
+license = "Apache-2.0"
+repository = "https://github.com/valaphee/vixen.git"
+description = "Next Generation [Distribution/Delivery/Data] [Platform/Pipeline]"
+
+[dependencies]
+aes = "0.8.2"
+anyhow = "1.0"
+bitflags = "2.0.0-rc.1"
+byteorder = "1.4"
+cbc = { version = "0.1.2", features = ["alloc"] }
+csv = "1.1.6"
+fasthash = "0.4"
+flate2 = "1.0.25"
+hex = { version = "0.4.3", features = ["serde"] }
+md-5 = "0.10.5"
+serde = { version = "1.0.152", features = ["derive"] }
+sha1 = "0.10.5"
+thiserror = "1.0"
+toml = "0.7.0"
+hexdump = "0.1.1"

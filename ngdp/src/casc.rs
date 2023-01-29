@@ -1,32 +1,74 @@
+use crate::blte::Blte;
 use anyhow::{bail, Result};
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
 use fasthash::lookup3;
+use std::collections::HashMap;
+use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-enum CascError {
-    #[error("invalid size")]
-    InvalidSize,
-    #[error("unknown block type")]
-    UnknownBlockType,
-    #[error("unknown version")]
-    UnknownVersion,
-    #[error("checksum mismatch")]
-    ChecksumMismatch,
+pub enum CascError {
+    #[error("unsupported")]
+    Unsupported,
+    #[error("integrity error")]
+    IntegrityError,
+
+    #[error("entry not found")]
+    EntryNotFound,
+}
+
+pub struct Casc {
+    path: PathBuf,
+    entries: HashMap<[u8; 9], Entry>,
+}
+
+impl Casc {
+    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let mut pathbuf = PathBuf::new();
+        pathbuf.push(path);
+
+        let shared_memory = SharedMemory::read_from(&mut File::open(pathbuf.join("shmem"))?)?;
+        let mut entries = HashMap::new();
+        for (bucket, version) in shared_memory.versions.into_iter().enumerate() {
+            let mut index_file =
+                File::open(pathbuf.join(format!("{bucket:02x}{version:08x}.idx")))?;
+            let index = Index::read_from(&mut index_file)?;
+            for entry in index.entries {
+                let key: Box<[u8; 9]> = entry.key.clone().into_boxed_slice().try_into().unwrap();
+                entries.insert(*key, entry);
+            }
+        }
+
+        Ok(Self {
+            path: pathbuf,
+            entries,
+        })
+    }
+
+    pub fn get(&self, key: &[u8]) -> Result<Vec<u8>> {
+        let entry = self
+            .entries
+            .get(&key[..9])
+            .ok_or(CascError::EntryNotFound)?;
+        let mut file = File::open(self.path.join(format!("data.{:03}", entry.file)))?;
+        entry.read(&mut file)?;
+        Blte::read_from(&mut file)
+    }
 }
 
 #[derive(Debug)]
 struct SharedMemory {
     data_path: String,
     versions: Vec<u32>,
-    free_spaces: Vec<Data>,
+    free_spaces: Vec<Entry>,
 }
 
 impl SharedMemory {
     fn read_from<R: Read + Seek>(input: &mut R) -> Result<Self> {
         if input.read_u32::<LittleEndian>()? /* Header Type */ != 4 {
-            bail!(CascError::UnknownBlockType)
+            bail!(CascError::Unsupported)
         }
         let header_size = input.read_u32::<LittleEndian>()?;
         let mut path = vec![0; 0x100];
@@ -41,14 +83,14 @@ impl SharedMemory {
         }
 
         if input.read_u32::<LittleEndian>()? /* Free Space Type */ != 1 {
-            bail!(CascError::UnknownBlockType)
+            bail!(CascError::Unsupported)
         }
         let free_space_size = input.read_u32::<LittleEndian>()?;
         let mut free_spaces = Vec::with_capacity(free_space_size as usize);
         input.seek(SeekFrom::Current(0x18))?;
         for _ in 0..free_space_size {
-            let length = Data::read_from(input, 0, 5, 0, 30)?;
-            free_spaces.push(Data {
+            let length = Entry::read_from(input, 0, 5, 0, 30)?;
+            free_spaces.push(Entry {
                 key: vec![],
                 file: 0,
                 offset: 0,
@@ -57,7 +99,7 @@ impl SharedMemory {
         }
         input.seek(SeekFrom::Current(((1090 - free_space_size) * 5) as i64))?;
         for index in 0..free_space_size {
-            let file_offset = Data::read_from(input, 0, 5, 0, 30)?;
+            let file_offset = Entry::read_from(input, 0, 5, 0, 30)?;
             let entry = &mut free_spaces[index as usize];
             entry.file = file_offset.file;
             entry.offset = file_offset.offset;
@@ -86,7 +128,7 @@ struct Index {
     entry_key_size: u8,
     entry_segment_bits: u8,
     limit: u64,
-    entries: Vec<Data>,
+    entries: Vec<Entry>,
 }
 
 impl Index {
@@ -95,11 +137,11 @@ impl Index {
         let header_hash = input.read_u32::<LittleEndian>()?;
         input.read_exact(&mut header_data)?;
         if header_hash != lookup3::hash32(&header_data) {
-            bail!(CascError::ChecksumMismatch)
+            bail!(CascError::IntegrityError)
         }
         let mut header_data = header_data.as_slice();
         if header_data.read_u16::<LittleEndian>()? /* Version */ != 7 {
-            bail!(CascError::UnknownVersion)
+            bail!(CascError::Unsupported)
         }
         let bucket = header_data.read_u16::<LittleEndian>()?;
         let entry_length_size = header_data.read_u8()?;
@@ -113,14 +155,14 @@ impl Index {
         let entries_hash = input.read_u32::<LittleEndian>()?;
         input.read_exact(&mut entries_data)?;
         /*if entries_hash != lookup3::hash32(&entries_data) {
-            bail!(CascError::ChecksumMismatch)
+            bail!(CascError::IntegrityError)
         }*/
         let mut entries_data = entries_data.as_slice();
         let entries_count = entries_data.len()
             / (entry_length_size + entry_location_size + entry_key_size) as usize;
         let mut entries = Vec::with_capacity(entries_count);
         for _ in 0..entries_count {
-            entries.push(Data::read_from(
+            entries.push(Entry::read_from(
                 &mut entries_data,
                 entry_length_size,
                 entry_location_size,
@@ -142,14 +184,14 @@ impl Index {
 }
 
 #[derive(Debug)]
-struct Data {
-    key: Vec<u8>,
-    file: u64,
-    offset: u64,
-    length: u64,
+struct Entry {
+    pub key: Vec<u8>,
+    pub file: u64,
+    pub offset: u64,
+    pub length: u64,
 }
 
-impl Data {
+impl Entry {
     fn read_from<R: Read>(
         input: &mut R,
         length_size: u8,
@@ -165,7 +207,7 @@ impl Data {
         let mut offset = input.read_uint::<BigEndian>(offset_size as usize)?;
         let extra_bits = (offset_size * 8) - segment_bits;
         file = (file << extra_bits) | (offset >> segment_bits);
-        offset = offset & ((1 << 32 - extra_bits) - 1);
+        offset &= (1 << (32 - extra_bits)) - 1;
         let length = if length_size == 0 {
             0
         } else {
@@ -185,7 +227,7 @@ impl Data {
         let mut key = [0; 0x10];
         input.read_exact(&mut key)?;
         if input.read_u32::<LittleEndian>()? != self.length as u32 {
-            bail!(CascError::InvalidSize);
+            bail!(CascError::IntegrityError);
         }
         input.read_u16::<LittleEndian>()?;
         {
@@ -196,7 +238,7 @@ impl Data {
             if input.read_u32::<LittleEndian>()?
                 != lookup3::hash32_with_seed(checksum_data, 0x3D6BE971)
             {
-                bail!(CascError::ChecksumMismatch)
+                bail!(CascError::IntegrityError)
             }
         }
         {
@@ -208,19 +250,15 @@ impl Data {
             for i in offset..checksum_offset {
                 hashed_data[(i & 3) as usize] ^= input.read_u8()?;
             }
-            let encoded_offset: [u8; 4] = unsafe {
-                std::mem::transmute(
-                    OFFSET_ENCODE_TABLE[((checksum_offset + 4) & 0xF) as usize]
-                        ^ (checksum_offset + 4),
-                )
-            };
+
+            let encoded_offset: [u8; 4] = (OFFSET_ENCODE_TABLE[((checksum_offset + 4) & 0xF) as usize] ^ (checksum_offset + 4)).to_ne_bytes();
             let checksum: [_; 4] = core::array::from_fn(|i| {
                 let j = (i + checksum_offset as usize) & 3;
                 hashed_data[j] ^ encoded_offset[j]
             });
             let checksum: u32 = unsafe { std::mem::transmute(checksum) };
             if input.read_u32::<LittleEndian>()? != checksum {
-                bail!(CascError::ChecksumMismatch)
+                bail!(CascError::IntegrityError)
             }
         }
 
@@ -228,7 +266,7 @@ impl Data {
     }
 }
 
-static OFFSET_ENCODE_TABLE: &'static [u32] = &[
+static OFFSET_ENCODE_TABLE: &[u32] = &[
     0x049396B8, 0x72A82A9B, 0xEE626CCA, 0x9917754F, 0x15DE40B1, 0xF5A8A9B6, 0x421EAC7E, 0xA9D55C9A,
     0x317FD40C, 0x04FAF80D, 0x3D6BE971, 0x52933CFD, 0x27F64B7D, 0xC6F5C11B, 0xD5757E3A, 0x6C388745,
 ];

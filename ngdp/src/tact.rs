@@ -1,43 +1,65 @@
 use anyhow::{bail, Result};
 use byteorder::{BigEndian, ReadBytesExt};
 use md5::{Digest, Md5};
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::io::Read;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-enum TactError {
-    #[error("invalid magic")]
-    InvalidMagic,
-    #[error("unknown version")]
-    UnknownVersion,
-    #[error("checksum mismatch")]
-    ChecksumMismatch,
+pub enum TactError {
+    #[error("unsupported")]
+    Unsupported,
+    #[error("integrity error")]
+    IntegrityError,
+
+    #[error("entry not found")]
+    EntryNotFound,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BuildInfo {
+    #[serde(rename = "Build Key!HEX:16", with = "hex")]
+    pub build_key: [u8; 16],
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RootFile {
+    #[serde(rename = "#FILEID")]
+    pub file_id: String,
+    #[serde(rename = "MD5", with = "hex")]
+    pub md5: [u8; 16],
+    #[serde(rename = "CHUNK_ID")]
+    pub chunk_id: u8,
+    #[serde(rename = "PRIORITY")]
+    pub priority: u8,
+    #[serde(rename = "MPRIORITY")]
+    pub mpriority: u8,
+    #[serde(rename = "FILENAME")]
+    pub file_name: String,
+    #[serde(rename = "INSTALLPATH")]
+    pub install_path: String,
 }
 
 #[derive(Debug)]
-struct Encoding {
+pub struct Encoding {
     c_to_e_keys: HashMap<Vec<u8>, EncodingCToEKey>,
     e_key_specs: HashMap<Vec<u8>, EncodingEKeySpec>,
 }
 
 impl Encoding {
-    fn read_from<R: Read>(input: &mut R) -> Result<Self> {
+    pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
         if input.read_u16::<BigEndian>()? /* EN */ != 0x454E {
-            bail!(TactError::InvalidMagic);
+            bail!(TactError::Unsupported);
         }
-        if input.read_u8()? != 1 {
-            bail!(TactError::UnknownVersion);
-        }
+        input.read_u8()?;
         let c_key_size = input.read_u8()?;
         let e_key_size = input.read_u8()?;
         let c_to_e_key_page_size = input.read_u16::<BigEndian>()?;
         let e_key_spec_page_size = input.read_u16::<BigEndian>()?;
         let c_to_e_key_page_count = input.read_u32::<BigEndian>()?;
         let e_key_spec_page_count = input.read_u32::<BigEndian>()?;
-        if input.read_u8()? != 0 {
-            bail!(TactError::UnknownVersion);
-        }
+        input.read_u8()?;
 
         let mut e_spec_block = vec![0; input.read_u32::<BigEndian>()? as usize];
         input.read_exact(&mut e_spec_block)?;
@@ -55,10 +77,10 @@ impl Encoding {
         for c_to_e_key_page in &mut c_to_e_key_page_table {
             let mut c_to_e_key_page_data = vec![0; c_to_e_key_page_size as usize * 1024];
             input.read_exact(&mut c_to_e_key_page_data)?;
-            let mut md5 = Md5::new();
-            md5.update(&c_to_e_key_page_data);
-            if c_to_e_key_page.md5 != md5.finalize().as_slice() {
-                bail!(TactError::ChecksumMismatch);
+            let mut c_to_e_key_page_md5 = Md5::new();
+            c_to_e_key_page_md5.update(&c_to_e_key_page_data);
+            if c_to_e_key_page.md5 != c_to_e_key_page_md5.finalize().as_slice() {
+                bail!(TactError::IntegrityError);
             }
             let mut c_to_e_key_page_data = c_to_e_key_page_data.as_slice();
             while let Ok(c_to_e_key) =
@@ -76,10 +98,10 @@ impl Encoding {
         for e_key_spec_page in &mut e_key_spec_page_table {
             let mut e_key_spec_page_data = vec![0; e_key_spec_page_size as usize * 1024];
             input.read_exact(&mut e_key_spec_page_data)?;
-            let mut md5 = Md5::new();
-            md5.update(&e_key_spec_page_data);
-            if e_key_spec_page.md5 != md5.finalize().as_slice() {
-                bail!(TactError::ChecksumMismatch);
+            let mut e_key_spec_page_md5 = Md5::new();
+            e_key_spec_page_md5.update(&e_key_spec_page_data);
+            if e_key_spec_page.md5 != e_key_spec_page_md5.finalize().as_slice() {
+                bail!(TactError::IntegrityError);
             }
             let mut e_key_spec_page_data = e_key_spec_page_data.as_slice();
             while let Ok(e_key_spec) =
@@ -93,6 +115,13 @@ impl Encoding {
             c_to_e_keys,
             e_key_specs,
         })
+    }
+
+    pub fn get(&self, key: &[u8]) -> Result<Vec<u8>, TactError> {
+        self.c_to_e_keys
+            .get(key)
+            .ok_or(TactError::EntryNotFound)
+            .map(|c_to_e_key| c_to_e_key.e_keys.first().unwrap().clone())
     }
 }
 
@@ -154,7 +183,7 @@ struct EncodingEKeySpec {
 }
 
 impl EncodingEKeySpec {
-    fn read_from<R: Read>(input: &mut R, e_key_size: u8, e_specs: &Vec<String>) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut R, e_key_size: u8, e_specs: &[String]) -> Result<Self> {
         Ok(Self {
             e_key: {
                 let mut e_key = vec![0; e_key_size as usize];

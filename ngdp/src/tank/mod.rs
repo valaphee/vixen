@@ -1,13 +1,15 @@
+pub mod guid;
+pub mod texture;
+
 use aes::cipher::block_padding::NoPadding;
 use aes::cipher::{BlockDecryptMut, KeyIvInit};
 use anyhow::Result;
 use byteorder::{LittleEndian, ReadBytesExt};
 use sha1::{Digest, Sha1};
 use std::io::Read;
-use std::ops::Rem;
 
 #[derive(Debug)]
-struct ContentManifest {
+pub struct ContentManifest {
     build_version: u32,
     unknown_04: u32,
     unknown_08: u32,
@@ -17,12 +19,12 @@ struct ContentManifest {
     unknown_18: u32,
     asset_patch_record_count: u32,
     entry_patch_record_count: u32,
-    assets: Vec<ContentManifestAsset>,
     entries: Vec<ContentManifestEntry>,
+    pub assets: Vec<ContentManifestAsset>,
 }
 
 impl ContentManifest {
-    fn read_from(mut input: &[u8], fileid: String) -> Result<Self> {
+    pub fn read_from(mut input: &[u8], file_name: String) -> Result<Self> {
         let build_version = input.read_u32::<LittleEndian>()?;
         let unknown_04 = input.read_u32::<LittleEndian>()?;
         let unknown_08 = input.read_u32::<LittleEndian>()?;
@@ -38,9 +40,9 @@ impl ContentManifest {
         if input.read_u32::<LittleEndian>()? >> 8 /* cmf */ != 0x636D66 {}
         let input = {
             if build_version != 109168 {}
-            let mut fileid_sha1 = Sha1::new();
-            fileid_sha1.update(fileid);
-            let fileid_sha1 = fileid_sha1.finalize();
+            let mut file_name_sha1 = Sha1::new();
+            file_name_sha1.update(file_name);
+            let file_name_sha1 = file_name_sha1.finalize();
             let key = {
                 let mut buffer = [0u8; 0x20];
                 let mut kidx = buffer.len() as u32 * build_version;
@@ -58,8 +60,10 @@ impl ContentManifest {
                 for i in 0..buffer.len() {
                     buffer[i] = KEYTABLE[(kidx % 0x200) as usize];
                     kidx = kidx.wrapping_add(build_version.wrapping_mul(asset_count) % 7);
-                    buffer[i] ^= fileid_sha1
-                        [kidx.wrapping_sub(73).rem_euclid(fileid_sha1.len() as u32) as usize]
+                    buffer[i] ^= file_name_sha1[kidx
+                        .wrapping_sub(73)
+                        .rem_euclid(file_name_sha1.len() as u32)
+                        as usize]
                 }
                 buffer
             };
@@ -113,11 +117,11 @@ impl ContentManifestEntry {
 }
 
 #[derive(Debug)]
-struct ContentManifestAsset {
-    guid: u64,
+pub struct ContentManifestAsset {
+    pub guid: u64,
     size: u32,
     unknown_0c: u8,
-    md5: [u8; 0x10],
+    pub md5: [u8; 0x10],
 }
 
 impl ContentManifestAsset {
@@ -153,7 +157,7 @@ struct ResourceGraph {
 }
 
 impl ResourceGraph {
-    fn read_from(mut input: &[u8], fileid: String) -> Result<Self> {
+    pub fn read_from(mut input: &[u8], file_name: String) -> Result<Self> {
         let unknown_00 = input.read_u32::<LittleEndian>()?;
         let build_version = input.read_u32::<LittleEndian>()?;
         let unknown_08 = input.read_u32::<LittleEndian>()?;
@@ -173,9 +177,9 @@ impl ResourceGraph {
         if input.read_u32::<LittleEndian>()? >> 8 /* trg */ != 0x677274 {}
         let input = {
             if build_version != 109168 {}
-            let mut fileid_sha1 = Sha1::new();
-            fileid_sha1.update(fileid);
-            let fileid_sha1 = fileid_sha1.finalize();
+            let mut file_name_sha1 = Sha1::new();
+            file_name_sha1.update(file_name);
+            let file_name_sha1 = file_name_sha1.finalize();
             let key = {
                 let mut buffer = [0u8; 0x20];
                 let mut kidx = buffer.len() as u32 * build_version;
@@ -193,8 +197,8 @@ impl ResourceGraph {
                 for i in 0..buffer.len() {
                     buffer[i] = KEYTABLE[(kidx % 0x200) as usize];
                     kidx = kidx.wrapping_add(build_version.wrapping_mul(skin_count) % 7);
-                    buffer[i] ^=
-                        fileid_sha1[(kidx.wrapping_sub(73) % fileid_sha1.len() as u32) as usize]
+                    buffer[i] ^= file_name_sha1
+                        [(kidx.wrapping_sub(73) % file_name_sha1.len() as u32) as usize]
                 }
                 buffer
             };
@@ -322,7 +326,7 @@ impl ResourceGraphSkinAsset {
 type Aes256CbcEnc = cbc::Encryptor<aes::Aes256>;
 type Aes256CbcDec = cbc::Decryptor<aes::Aes256>;
 
-static KEYTABLE: &'static [u8] = &[
+static KEYTABLE: &[u8] = &[
     0xCB, 0x08, 0x59, 0x42, 0x68, 0xE7, 0xC9, 0xE7, 0x34, 0x4A, 0x62, 0xB2, 0xD2, 0x66, 0x22, 0x49,
     0x05, 0x93, 0x09, 0x3E, 0x32, 0x32, 0xE8, 0x82, 0x62, 0x34, 0xDD, 0xA9, 0x8B, 0x4C, 0x3D, 0xF9,
     0xFF, 0xF2, 0x42, 0x3A, 0x3B, 0xC7, 0x8B, 0x0B, 0xDC, 0x73, 0x9F, 0x1A, 0x28, 0x1C, 0x01, 0xF8,

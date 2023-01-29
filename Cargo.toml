@@ -1,11 +1,12 @@
 [workspace]
 members = [
+    "ngdp",
+
     "vixen_cas",
     "vixen_obj",
     "vixen_steamaudio",
 
-    "vixen_bis_asset",
-    "vixen_pro_asset"
+    "vixen_bis_asset"
 ]
 resolver = "2"
 
