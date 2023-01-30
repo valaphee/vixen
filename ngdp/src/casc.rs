@@ -251,7 +251,10 @@ impl Entry {
                 hashed_data[(i & 3) as usize] ^= input.read_u8()?;
             }
 
-            let encoded_offset: [u8; 4] = (OFFSET_ENCODE_TABLE[((checksum_offset + 4) & 0xF) as usize] ^ (checksum_offset + 4)).to_ne_bytes();
+            let encoded_offset: [u8; 4] = (OFFSET_ENCODE_TABLE
+                [((checksum_offset + 4) & 0xF) as usize]
+                ^ (checksum_offset + 4))
+                .to_ne_bytes();
             let checksum: [_; 4] = core::array::from_fn(|i| {
                 let j = (i + checksum_offset as usize) & 3;
                 hashed_data[j] ^ encoded_offset[j]

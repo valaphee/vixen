@@ -1,4 +1,5 @@
 pub mod guid;
+pub mod stu;
 pub mod texture;
 
 use aes::cipher::block_padding::NoPadding;

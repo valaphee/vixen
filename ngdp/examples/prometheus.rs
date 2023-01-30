@@ -1,11 +1,11 @@
-use std::collections::HashMap;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
 use csv::ReaderBuilder;
 use ngdp::casc::Casc;
 use ngdp::tact::{BuildInfo, Encoding, RootFile};
 use ngdp::tank::ContentManifest;
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::path::PathBuf;
 
 fn main() {
     let path = PathBuf::from("/drive_c/Program Files (x86)/Overwatch");
