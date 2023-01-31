@@ -1,5 +1,5 @@
 use crate::tank::stu::error::{Error, Result};
-use crate::tank::stu::{read_bag, Field, InlineArray, Instance};
+use crate::tank::stu::{crc64, read_bag, Field, InlineArray, Instance};
 use byteorder::{LittleEndian, ReadBytesExt};
 use crc::Crc;
 use std::io::{Cursor, Read, Seek, SeekFrom};
@@ -11,6 +11,7 @@ pub struct Deserializer<'de> {
     inline_arrays: Vec<InlineArray>,
     fields: Vec<Vec<Field>>,
     dynamic_data: Cursor<Vec<u8>>,
+    header_crc: u64,
 
     current_field_hash: u32,
     current_field_size: u32,
@@ -38,9 +39,13 @@ impl<'de> Deserializer<'de> {
                 .read_exact(&mut dynamic_data)
                 .map_err(Error::Io)?;
         }
-        data_cursor
-            .seek(SeekFrom::Start(data_offset as u64))
-            .map_err(Error::Io)?;
+
+        let header_crc = {
+            data_cursor.rewind().map_err(Error::Io)?;
+            let mut header = vec![0; 36];
+            data_cursor.read_exact(&mut header).map_err(Error::Io)?;
+            crc64(&header)
+        };
 
         Ok(Self {
             data: &mut data_cursor.into_inner()[data_offset as usize..],
@@ -49,6 +54,7 @@ impl<'de> Deserializer<'de> {
             inline_arrays,
             fields: field_sets,
             dynamic_data: Cursor::new(dynamic_data),
+            header_crc,
 
             current_field_hash: 0,
             current_field_size: 0,
@@ -182,7 +188,16 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
             });
         }
 
-        visitor.visit_u64(self.data.read_u64::<LittleEndian>().map_err(Error::Io)?)
+        // likely to be an obfuscated GUID
+        let mut value = self.data.read_u64::<LittleEndian>().map_err(Error::Io)?;
+        value ^= (self.current_field_hash as u64 | ((self.current_field_hash as u64) << 32))
+            ^ self.header_crc;
+        let mut bytes = value.to_le_bytes();
+        bytes.swap(0, 3);
+        bytes.swap(7, 1);
+        bytes.swap(2, 6);
+        bytes.swap(4, 5);
+        visitor.visit_u64(u64::from_le_bytes(bytes))
     }
 
     fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value>
@@ -243,7 +258,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
             .seek(SeekFrom::Start(offset as u64))
             .unwrap();
         let field_size = self.dynamic_data.read_u32::<LittleEndian>().unwrap();
-        let field_data_hash = self.dynamic_data.read_u32::<LittleEndian>().unwrap();
+        let field_data_crc = self.dynamic_data.read_u32::<LittleEndian>().unwrap();
         let field_offset = self.dynamic_data.read_u64::<LittleEndian>().unwrap();
         self.dynamic_data
             .seek(SeekFrom::Start(field_offset))
@@ -254,7 +269,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
         {
             let mut digest = CRC32.digest();
             digest.update(&field_data);
-            if field_data_hash != digest.finalize() {
+            if field_data_crc != digest.finalize() {
                 return Err(Error::IntegrityError);
             }
         }
@@ -276,11 +291,12 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
         unimplemented!()
     }
 
-    fn deserialize_option<V>(self, _visitor: V) -> Result<V::Value>
+    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
-        unimplemented!()
+        // there is no optional type, but this is needed for supporting optional fields
+        visitor.visit_some(self)
     }
 
     fn deserialize_unit<V>(self, _visitor: V) -> Result<V::Value>

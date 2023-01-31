@@ -4,7 +4,7 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use std::io::Read;
 
 #[derive(Debug)]
-pub struct Texture {
+pub struct TeTexture {
     pub flags: TextureFlags,
     pub mip_level_count: u8,
     pub format: u8,
@@ -14,12 +14,12 @@ pub struct Texture {
     pub stencil: bool,
     pub width: u16,
     pub height: u16,
-    pub payload: Option<TexturePayload>,
+    pub first_payload: Option<TeTexturePayload>,
     pub unknown10: u8, // uv map mode?
     pub unknown11: u8, // type?
 }
 
-impl Texture {
+impl TeTexture {
     pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
         let flags = TextureFlags::from_bits(input.read_u8()?).unwrap();
         input.read_u8()?; // always 0
@@ -34,11 +34,12 @@ impl Texture {
         input.read_u32::<LittleEndian>()?; // size
         let unknown10 = input.read_u8()?;
         let unknown11 = input.read_u8()?;
+        input.read_u16::<LittleEndian>()?; // padding
         input.read_u32::<LittleEndian>()?; // padding
         input.read_u32::<LittleEndian>()?; // padding
         input.read_u32::<LittleEndian>()?; // padding
-        let payload = if payload_count != 0 {
-            Some(TexturePayload::read_from(input)?)
+        let first_payload = if payload_count != 0 {
+            Some(TeTexturePayload::read_from(input)?)
         } else {
             None
         };
@@ -53,7 +54,7 @@ impl Texture {
             stencil,
             width,
             height,
-            payload,
+            first_payload,
             unknown10,
             unknown11,
         })
@@ -75,13 +76,13 @@ bitflags! {
 }
 
 #[derive(Debug)]
-pub struct TexturePayload {
+pub struct TeTexturePayload {
     pub mip_level: u32,
     pub mip_level_count: u32,
     pub data: Vec<u8>,
 }
 
-impl TexturePayload {
+impl TeTexturePayload {
     pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
         let mip_level = input.read_u32::<LittleEndian>()?;
         let mip_level_count = input.read_u32::<LittleEndian>()?;

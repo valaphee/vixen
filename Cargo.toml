@@ -6,7 +6,8 @@ members = [
     "vixen_obj",
     "vixen_steamaudio",
 
-    "vixen_bis_asset"
+    "vixen_bis_asset",
+    "vixen_prometheus"
 ]
 resolver = "2"
 

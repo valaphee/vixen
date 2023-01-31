@@ -117,10 +117,9 @@ impl Encoding {
         })
     }
 
-    pub fn get(&self, key: &[u8]) -> Result<Vec<u8>, TactError> {
+    pub fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
         self.c_to_e_keys
             .get(key)
-            .ok_or(TactError::EntryNotFound)
             .map(|c_to_e_key| c_to_e_key.e_keys.first().unwrap().clone())
     }
 }

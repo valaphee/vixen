@@ -1,3 +1,6 @@
+use serde::{Deserialize, Deserializer};
+
+#[derive(Debug)]
 pub struct Guid {
     pub engine: u8,
     pub type_: u16,
@@ -28,5 +31,14 @@ impl From<u64> for Guid {
             locale: ((value >> 32) & 0x1F) as u8,
             index: (value & 0xFFFFFFFF) as u32,
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for Guid {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(Guid::from(u64::deserialize(deserializer)?))
     }
 }

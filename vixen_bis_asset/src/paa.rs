@@ -37,7 +37,7 @@ async fn load_paa<'a, 'b>(bytes: &'a [u8], load_context: &'a mut LoadContext<'b>
     let file = Paa::read_from(&mut Cursor::new(bytes.to_vec()))?;
 
     let mut image = Image::default();
-    image.texture_descriptor.format = file.kind.texture_format();
+    image.texture_descriptor.format = file.type_.texture_format();
     image.texture_descriptor.mip_level_count = file.mipmaps.len() as u32;
     let (width, height) = {
         let PaaMipmap {
@@ -66,7 +66,7 @@ async fn load_paa<'a, 'b>(bytes: &'a [u8], load_context: &'a mut LoadContext<'b>
 
 #[derive(Debug)]
 struct Paa {
-    kind: PaaKind,
+    type_: PaaType,
     tags: Vec<PaaTag>,
     palette: Vec<u32>,
     mipmaps: Vec<PaaMipmap>,
@@ -74,7 +74,7 @@ struct Paa {
 
 impl Paa {
     fn read_from<R: Read + Seek>(input: &mut R) -> Result<Paa> {
-        let kind = PaaKind::read_from(input)?;
+        let type_ = PaaType::read_from(input)?;
 
         let mut tags = Vec::new();
         let mut position = input.stream_position()?;
@@ -91,12 +91,12 @@ impl Paa {
         }
 
         let mut mipmaps = Vec::new();
-        while let Ok(mipmap) = PaaMipmap::read_from(input, &kind) {
+        while let Ok(mipmap) = PaaMipmap::read_from(input, &type_) {
             mipmaps.push(mipmap);
         }
 
         Ok(Self {
-            kind,
+            type_,
             tags,
             palette,
             mipmaps,
@@ -105,13 +105,13 @@ impl Paa {
 }
 
 #[derive(Debug)]
-enum PaaKind {
+enum PaaType {
     Dxt1,
     Dxt5,
 }
 
-impl PaaKind {
-    fn read_from<R: Read>(input: &mut R) -> Result<PaaKind> {
+impl PaaType {
+    fn read_from<R: Read>(input: &mut R) -> Result<PaaType> {
         Ok(match input.read_u16::<LittleEndian>()? {
             0xFF01 => Self::Dxt1,
             0xFF05 => Self::Dxt5,
@@ -193,7 +193,7 @@ struct PaaMipmap {
 }
 
 impl PaaMipmap {
-    fn read_from<R: Read>(input: &mut R, kind: &PaaKind) -> Result<Self> {
+    fn read_from<R: Read>(input: &mut R, type_: &PaaType) -> Result<Self> {
         let mut width = input.read_u16::<LittleEndian>()?;
         let mut height = input.read_u16::<LittleEndian>()?;
         let size = input.read_u24::<LittleEndian>()?;
@@ -209,7 +209,7 @@ impl PaaMipmap {
         } else */if width & 0x8000 != 0 {
             width &= 0x7FFF;
 
-            minilzo::decompress(&data, kind.size(width as usize, height as usize))?
+            minilzo::decompress(&data, type_.size(width as usize, height as usize))?
         } else {
             data
         };

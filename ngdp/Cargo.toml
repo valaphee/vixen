@@ -14,7 +14,6 @@ bitflags = "2.0.0-rc.1"
 byteorder = "1.4"
 cbc = { version = "0.1.2", features = ["alloc"] }
 crc = "3.0.1"
-csv = "1.1.6"
 fasthash = "0.4"
 flate2 = "1.0.25"
 hex = { version = "0.4.3", features = ["serde"] }
@@ -22,5 +21,6 @@ md-5 = "0.10.5"
 serde = { version = "1.0.152", features = ["derive"] }
 sha1 = "0.10.5"
 thiserror = "1.0"
-toml = "0.7.0"
-hexdump = "0.1.1"
+
+[dev-dependencies]
+csv = "1.1.6"
