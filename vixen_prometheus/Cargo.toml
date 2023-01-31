@@ -12,7 +12,7 @@ anyhow = "1.0"
 bevy = { version = "0.9", default-features = false, features = ["bevy_asset", "bevy_render"] }
 csv = "1.1.6"
 hex = { version = "0.4.3", features = ["serde"] }
-ngdp = { path = "../ngdp" }
+prometheus = { path = "../prometheus" }
 thiserror = "1.0"
 
 [dev-dependencies]

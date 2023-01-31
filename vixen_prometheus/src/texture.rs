@@ -1,9 +1,9 @@
 use anyhow::Result;
 use bevy::asset::{AssetLoader, BoxedFuture, LoadContext, LoadedAsset};
 use bevy::prelude::*;
-use bevy::render::render_resource::{Extent3d, TextureFormat};
-use ngdp::tank::guid::Guid;
-use ngdp::tank::tes::{TeTexture, TeTexturePayload};
+use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+use prometheus::guid::Guid;
+use prometheus::te_texture::{TeTexture, TeTexturePayload, TeTextureFlags};
 use std::error::Error;
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -30,10 +30,6 @@ async fn load_te_texture<'a, 'b>(
     load_context: &'a mut LoadContext<'b>,
 ) -> Result<()> {
     let te_texture = TeTexture::read_from(&mut Cursor::new(bytes.to_vec()))?;
-    if te_texture.depth_or_array_layers != 1 {
-        return Ok(());
-    }
-
     let mut te_texture_payloads = Vec::with_capacity(te_texture.payload_count as usize);
     te_texture_payloads.push(te_texture.first_payload.unwrap());
     if te_texture.payload_count > 1 {
@@ -68,6 +64,15 @@ async fn load_te_texture<'a, 'b>(
         depth_or_array_layers: te_texture.depth_or_array_layers as u32,
     };
     image.texture_descriptor.mip_level_count = te_texture.mip_level_count as u32;
+    image.texture_descriptor.dimension = if te_texture.flags.contains(TeTextureFlags::D1) {
+        TextureDimension::D1
+    } else if te_texture.flags.contains(TeTextureFlags::D2) {
+        TextureDimension::D2
+    } else if te_texture.flags.contains(TeTextureFlags::D3) {
+        TextureDimension::D3
+    } else {
+        todo!()
+    };
     image.texture_descriptor.format = match te_texture.format {
         10 => TextureFormat::Rgba16Float,
         29 => TextureFormat::Rgba8UnormSrgb,

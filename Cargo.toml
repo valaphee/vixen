@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "ngdp",
+    "prometheus",
 
     "vixen_cas",
     "vixen_obj",

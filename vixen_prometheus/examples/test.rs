@@ -1,11 +1,11 @@
 use bevy::prelude::*;
-use ngdp::tank::guid::Guid;
+use prometheus::guid::Guid;
 use vixen_prometheus::texture::TeTextureLoader;
-use vixen_prometheus::TankAssetIo;
+use vixen_prometheus::asset_io::AssetIo;
 
 fn main() {
     App::new()
-        .insert_resource(AssetServer::new(TankAssetIo::default()))
+        .insert_resource(AssetServer::new(AssetIo::default()))
         .add_plugins(DefaultPlugins)
         .init_asset_loader::<TeTextureLoader>()
         .add_startup_system(setup)

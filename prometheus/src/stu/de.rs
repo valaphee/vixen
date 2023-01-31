@@ -1,5 +1,5 @@
-use crate::tank::stu::error::{Error, Result};
-use crate::tank::stu::{crc64, read_bag, Field, InlineArray, Instance};
+use crate::stu::error::{Error, Result};
+use crate::stu::{crc64, read_bag, Field, InlineArray, Instance};
 use byteorder::{LittleEndian, ReadBytesExt};
 use crc::Crc;
 use std::io::{Cursor, Read, Seek, SeekFrom};

@@ -1,11 +1,11 @@
 [package]
-name = "ngdp"
+name = "prometheus"
 version = "0.0.1"
 edition = "2021"
 authors = ["Valaphee <iam@valaphee.com>"]
 license = "Apache-2.0"
 repository = "https://github.com/valaphee/vixen.git"
-description = "Next Generation [Distribution/Delivery/Data] [Platform/Pipeline]"
+description = "Prometheus"
 
 [dependencies]
 aes = "0.8.2"

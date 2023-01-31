@@ -1,7 +1,7 @@
 use csv::ReaderBuilder;
-use ngdp::casc::Casc;
-use ngdp::tact::{BuildInfo, Encoding, RootFile};
-use ngdp::tank::ContentManifest;
+use prometheus::casc::Casc;
+use prometheus::tact::{BuildInfo, Encoding, RootFile};
+use prometheus::tank::ContentManifest;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
