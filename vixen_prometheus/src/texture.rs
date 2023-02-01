@@ -36,7 +36,7 @@ async fn load_texture<'a, 'b>(
     image.texture_descriptor.size = Extent3d {
         width: header.width as u32,
         height: header.height as u32,
-        depth_or_array_layers: header.depth_or_array_layers as u32,
+        depth_or_array_layers: /*header.depth_or_array_layers as u32*/1,
     };
     image.texture_descriptor.mip_level_count = header.mip_level_count as u32;
 
@@ -47,6 +47,8 @@ async fn load_texture<'a, 'b>(
         TextureDimension::D2
     } else if flags.contains(TextureFlags::D3) {
         TextureDimension::D3
+    } else if flags.contains(TextureFlags::Cubemap) {
+        TextureDimension::D2
     } else {
         todo!()
     };
@@ -59,6 +61,7 @@ async fn load_texture<'a, 'b>(
         73 => TextureFormat::Bc1RgbaUnormSrgb,
         81 => TextureFormat::Bc4RUnorm,
         84 => TextureFormat::Bc5RgUnorm,
+        96 => TextureFormat::Bc6hRgbUfloat,
         99 => TextureFormat::Bc7RgbaUnorm,
         100 => TextureFormat::Bc7RgbaUnormSrgb,
         _ => todo!(),
@@ -93,6 +96,8 @@ async fn load_texture<'a, 'b>(
             data_.split_at(std::mem::size_of::<TexturePayloadHeader>());
         let payload_header: &TexturePayloadHeader = bytemuck::from_bytes(payload_header_bytes);
         data.extend_from_slice(&payload_data[..payload_header.size as usize])
+    } else {
+        data.extend_from_slice(&data_[..header.size as usize])
     }
     image.data = data;
 
