@@ -3,8 +3,7 @@ use bevy::asset::{AssetLoader, BoxedFuture, LoadContext, LoadedAsset};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use prometheus::guid::Guid;
-use prometheus::te_texture::{TeTexture, TeTexturePayload, TeTextureFlags};
-use std::error::Error;
+use prometheus::texture::{Texture, TexturePayload, TextureFlags};
 use std::io::Cursor;
 use std::path::PathBuf;
 
@@ -29,10 +28,10 @@ async fn load_te_texture<'a, 'b>(
     bytes: &'a [u8],
     load_context: &'a mut LoadContext<'b>,
 ) -> Result<()> {
-    let te_texture = TeTexture::read_from(&mut Cursor::new(bytes.to_vec()))?;
-    let mut te_texture_payloads = Vec::with_capacity(te_texture.payload_count as usize);
-    te_texture_payloads.push(te_texture.first_payload.unwrap());
-    if te_texture.payload_count > 1 {
+    let texture = Texture::read_from(&mut Cursor::new(bytes.to_vec()))?;
+    let mut te_texture_payloads = Vec::with_capacity(texture.payload_count as usize);
+    te_texture_payloads.push(texture.first_payload.unwrap());
+    if texture.payload_count > 1 {
         let mut guid = Guid::from(
             load_context
                 .path()
@@ -44,11 +43,11 @@ async fn load_te_texture<'a, 'b>(
                 .unwrap(),
         );
 
-        for payload_id in 1..te_texture.payload_count {
+        for payload_id in 1..texture.payload_count {
             guid.type_ = 0x04D;
             guid.locale = payload_id;
 
-            te_texture_payloads.push(TeTexturePayload::read_from(&mut Cursor::new(
+            te_texture_payloads.push(TexturePayload::read_from(&mut Cursor::new(
                 load_context
                     .read_asset_bytes(PathBuf::from(guid.to_raw().to_string()))
                     .await?
@@ -59,21 +58,21 @@ async fn load_te_texture<'a, 'b>(
 
     let mut image = Image::default();
     image.texture_descriptor.size = Extent3d {
-        width: te_texture.width as u32,
-        height: te_texture.height as u32,
-        depth_or_array_layers: te_texture.depth_or_array_layers as u32,
+        width: texture.width as u32,
+        height: texture.height as u32,
+        depth_or_array_layers: texture.depth_or_array_layers as u32,
     };
-    image.texture_descriptor.mip_level_count = te_texture.mip_level_count as u32;
-    image.texture_descriptor.dimension = if te_texture.flags.contains(TeTextureFlags::D1) {
+    image.texture_descriptor.mip_level_count = texture.mip_level_count as u32;
+    image.texture_descriptor.dimension = if texture.flags.contains(TextureFlags::D1) {
         TextureDimension::D1
-    } else if te_texture.flags.contains(TeTextureFlags::D2) {
+    } else if texture.flags.contains(TextureFlags::D2) {
         TextureDimension::D2
-    } else if te_texture.flags.contains(TeTextureFlags::D3) {
+    } else if texture.flags.contains(TextureFlags::D3) {
         TextureDimension::D3
     } else {
         todo!()
     };
-    image.texture_descriptor.format = match te_texture.format {
+    image.texture_descriptor.format = match texture.format {
         10 => TextureFormat::Rgba16Float,
         29 => TextureFormat::Rgba8UnormSrgb,
         30 => TextureFormat::Rgba8UnormSrgb,

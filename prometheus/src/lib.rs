@@ -1,7 +1,9 @@
 pub mod blte;
 pub mod casc;
+pub mod chunked_data;
 pub mod guid;
+pub mod model;
 pub mod stu;
 pub mod tact;
-pub mod tank;
-pub mod te_texture;
+pub mod tact_manifest;
+pub mod texture;

@@ -3,7 +3,7 @@ use bevy::asset::{AssetIoError, BoxedFuture, Metadata};
 use csv::ReaderBuilder;
 use prometheus::casc::Casc;
 use prometheus::tact::{BuildInfo, Encoding, RootFile};
-use prometheus::tank::ContentManifest;
+use prometheus::tact_manifest::ContentManifest;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};

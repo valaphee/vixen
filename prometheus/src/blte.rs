@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use byteorder::{BigEndian, ReadBytesExt};
+use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
 use flate2::read::ZlibDecoder;
 use md5::{Digest, Md5};
 use std::io::Read;
@@ -19,7 +19,7 @@ pub struct Blte;
 
 impl Blte {
     pub fn read_from<R: Read>(input: &mut R) -> Result<Vec<u8>> {
-        if input.read_u32::<BigEndian>().unwrap() /* BLTE */ != 0x424C5445 {
+        if input.read_u32::<BigEndian>().unwrap() != u32::from_be_bytes(*b"BLTE") {
             bail!(BlteError::Unsupported);
         }
         input.read_u32::<BigEndian>().unwrap();

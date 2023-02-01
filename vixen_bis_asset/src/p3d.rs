@@ -4,8 +4,8 @@ use bevy::{
     prelude::*,
     render::mesh::{Indices, PrimitiveTopology},
 };
-use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
-use std::io::{Cursor, Read, Seek, SeekFrom};
+use byteorder::{LittleEndian, ReadBytesExt};
+use std::io::{Cursor, Read};
 use thiserror::Error;
 
 #[derive(Default)]
@@ -97,7 +97,7 @@ struct Mlod(Vec<P3dm>);
 
 impl Mlod {
     fn read_from<R: Read>(input: &mut R) -> Result<Self> {
-        if input.read_u32::<BigEndian>()? /* MLOD */ != 0x4D4C4F44 {
+        if input.read_u32::<LittleEndian>()? != u32::from_be_bytes(*b"MLOD") {
             bail!(P3dError::InvalidMagic)
         }
         let version = input.read_u32::<LittleEndian>()?;
@@ -127,7 +127,7 @@ struct P3dm {
 
 impl P3dm {
     fn read_from<R: Read>(input: &mut R) -> Result<Self> {
-        if input.read_u32::<BigEndian>()? /* P3DM */ != 0x5033444D {
+        if input.read_u32::<LittleEndian>()? != u32::from_be_bytes(*b"P3DM") {
             bail!(P3dError::InvalidMagic)
         }
         let major_version = input.read_u32::<LittleEndian>()?;
@@ -157,7 +157,7 @@ impl P3dm {
             faces.push(P3dmFace::read_from(input)?);
         }
 
-        if input.read_u32::<BigEndian>()? /* TAGG */ != 0x54414747 {
+        if input.read_u32::<LittleEndian>()? != u32::from_be_bytes(*b"TAGG") {
             bail!(P3dError::InvalidMagic)
         }
         let mut tags = Vec::new();

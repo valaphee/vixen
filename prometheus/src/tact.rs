@@ -49,7 +49,7 @@ pub struct Encoding {
 
 impl Encoding {
     pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
-        if input.read_u16::<BigEndian>()? /* EN */ != 0x454E {
+        if input.read_u16::<BigEndian>()? != u16::from_be_bytes(*b"EN") {
             bail!(TactError::Unsupported);
         }
         input.read_u8()?;

@@ -144,34 +144,32 @@ enum PaaTag {
 
 impl PaaTag {
     fn read_from<R: Read>(input: &mut R) -> Result<PaaTag> {
-        let mut name_bytes = [0u8; 8];
-        input.read_exact(&mut name_bytes)?;
-        let name: String = name_bytes.iter().rev().map(|&byte| byte as char).collect();
+        let id: [u8; 8] = input.read_u64::<LittleEndian>()?.to_be_bytes();
         let length = input.read_u32::<LittleEndian>()?;
 
-        Ok(match name.as_str() {
-            "AVGCTAGG" => {
+        Ok(match &id {
+            b"AVGCTAGG" => {
                 if length != 4 {
                     bail!(PaaError::InvalidTag)
                 }
 
                 PaaTag::AverageColor(input.read_u32::<LittleEndian>()?)
             }
-            "MAXCTAGG" => {
+            b"MAXCTAGG" => {
                 if length != 4 {
                     bail!(PaaError::InvalidTag)
                 }
 
                 PaaTag::MaximumColor(input.read_u32::<LittleEndian>()?)
             }
-            "SWIZTAGG" => {
+            b"SWIZTAGG" => {
                 if length != 4 {
                     bail!(PaaError::InvalidTag)
                 }
 
                 PaaTag::Swizzle(input.read_u32::<LittleEndian>()?)
             }
-            "OFFSTAGG" => {
+            b"OFFSTAGG" => {
                 if length != 64 {
                     bail!(PaaError::InvalidTag)
                 }
@@ -180,7 +178,7 @@ impl PaaTag {
                     input.read_u32::<LittleEndian>().unwrap()
                 }))
             }
-            _ => bail!(PaaError::UnknownTag(name)),
+            _ => bail!(PaaError::UnknownTag(std::str::from_utf8(&id)?.to_string())),
         })
     }
 }
