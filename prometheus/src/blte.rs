@@ -1,8 +1,9 @@
+use std::io::Read;
+
 use anyhow::{bail, Result};
-use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
+use byteorder::{BigEndian, ReadBytesExt};
 use flate2::read::ZlibDecoder;
 use md5::{Digest, Md5};
-use std::io::Read;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

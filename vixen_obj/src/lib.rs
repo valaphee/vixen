@@ -1,10 +1,11 @@
+use std::io::BufRead;
+
 use anyhow::{bail, Result};
 use bevy::{
     asset::{AssetLoader, BoxedFuture, LoadContext, LoadedAsset},
     prelude::*,
     render::mesh::PrimitiveTopology,
 };
-use std::io::BufRead;
 use thiserror::Error;
 
 /// Wavefront OBJ asset loader.

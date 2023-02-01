@@ -11,6 +11,7 @@ description = "Prometheus"
 aes = "0.8.2"
 anyhow = "1.0"
 bitflags = "2.0.0-rc.1"
+bytemuck = { version = "1.13.0", features = ["derive"] }
 byteorder = "1.4"
 cbc = { version = "0.1.2", features = ["alloc"] }
 crc = "3.0.1"

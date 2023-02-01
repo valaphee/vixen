@@ -1,8 +1,9 @@
+use std::sync::{Arc, Mutex};
+
 use bevy::prelude::*;
 use rodio::cpal::traits::HostTrait;
 use rodio::dynamic_mixer::{mixer, DynamicMixerController};
 use rodio::{cpal, queue, DeviceTrait, OutputStream, Source};
-use std::sync::{Arc, Mutex};
 use steamaudio::prelude::*;
 
 pub struct AudioPlugin;

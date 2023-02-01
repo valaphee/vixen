@@ -1,3 +1,5 @@
+use std::io::{Cursor, Read, Seek, SeekFrom};
+
 use anyhow::{bail, Result};
 use bevy::{
     asset::{AssetLoader, BoxedFuture, LoadContext, LoadedAsset},
@@ -5,7 +7,6 @@ use bevy::{
     render::render_resource::{Extent3d, TextureFormat},
 };
 use byteorder::{LittleEndian, ReadBytesExt};
-use std::io::{Cursor, Read, Seek, SeekFrom};
 use thiserror::Error;
 
 #[derive(Default)]

@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+
 use vixen_cas::CasAssetIo;
 use vixen_obj::ObjLoader;
 

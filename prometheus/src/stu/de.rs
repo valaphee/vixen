@@ -1,16 +1,21 @@
-use crate::stu::error::{Error, Result};
-use crate::stu::{crc64, read_bag, Field, InlineArray, Instance};
+use std::io::Read;
+
 use byteorder::{LittleEndian, ReadBytesExt};
 use crc::Crc;
-use std::io::{Cursor, Read, Seek, SeekFrom};
+
+use crate::stu::{
+    crc64,
+    error::{Error, Result},
+    DynamicDataHeader, Field, Header, InlineArray, Instance,
+};
 
 pub struct Deserializer<'de> {
     data: &'de [u8],
+    dynamic_data: &'de [u8],
 
-    instances: Vec<Instance>,
-    inline_arrays: Vec<InlineArray>,
-    fields: Vec<Vec<Field>>,
-    dynamic_data: Cursor<Vec<u8>>,
+    instances: &'de [Instance],
+    inline_arrays: &'de [InlineArray],
+    fields: Vec<&'de [Field]>,
     header_crc: u64,
 
     current_field_hash: u32,
@@ -19,41 +24,39 @@ pub struct Deserializer<'de> {
 
 impl<'de> Deserializer<'de> {
     pub fn from_slice(data: &'de mut [u8]) -> Result<Self> {
-        let mut data_cursor = Cursor::new(data);
-
-        let instances = read_bag(&mut data_cursor, Instance::read_from).map_err(Error::Io)?;
-        let inline_arrays =
-            read_bag(&mut data_cursor, InlineArray::read_from).map_err(Error::Io)?;
-        let field_sets = read_bag(&mut data_cursor, |read| read_bag(read, Field::read_from))
-            .map_err(Error::Io)?;
-        let dynamic_data_size = data_cursor.read_u32::<LittleEndian>().map_err(Error::Io)?;
-        let dynamic_data_offset = data_cursor.read_u32::<LittleEndian>().map_err(Error::Io)?;
-        let data_offset = data_cursor.read_u32::<LittleEndian>().map_err(Error::Io)?;
-
-        let mut dynamic_data = vec![0; dynamic_data_size as usize];
-        if dynamic_data_size > 0 {
-            data_cursor
-                .seek(SeekFrom::Start(dynamic_data_offset as u64))
-                .map_err(Error::Io)?;
-            data_cursor
-                .read_exact(&mut dynamic_data)
-                .map_err(Error::Io)?;
+        let header: &Header = bytemuck::from_bytes(&data[..std::mem::size_of::<Header>()]);
+        let instances: &[Instance] = bytemuck::cast_slice(
+            &data[header.instance_offset as usize
+                ..header.instance_offset as usize
+                    + header.instance_count as usize * std::mem::size_of::<Instance>()],
+        );
+        let inline_arrays: &[InlineArray] = bytemuck::cast_slice(
+            &data[header.inline_array_offset as usize
+                ..header.inline_array_offset as usize
+                    + header.inline_array_count as usize * std::mem::size_of::<InlineArray>()],
+        );
+        let mut fields: Vec<&[Field]> = Vec::new();
+        {
+            let mut sub_data = &data[header.field_set_offset as usize
+                ..header.field_set_offset as usize + header.field_set_count as usize * 8];
+            for _ in 0..header.field_set_count {
+                let count = sub_data.read_u32::<LittleEndian>()? as usize;
+                let offset = sub_data.read_u32::<LittleEndian>()? as usize;
+                fields.push(bytemuck::cast_slice(
+                    &data[offset..offset + count * std::mem::size_of::<Field>()],
+                ))
+            }
         }
-
-        let header_crc = {
-            data_cursor.rewind().map_err(Error::Io)?;
-            let mut header = vec![0; 36];
-            data_cursor.read_exact(&mut header).map_err(Error::Io)?;
-            crc64(&header)
-        };
+        let header_crc = crc64(&data[..std::mem::size_of::<Header>()]);
 
         Ok(Self {
-            data: &mut data_cursor.into_inner()[data_offset as usize..],
+            data: &data[header.data_offset as usize..],
+            dynamic_data: &data[header.dynamic_data_offset as usize
+                ..header.dynamic_data_offset as usize + header.dynamic_data_size as usize],
 
             instances,
             inline_arrays,
-            fields: field_sets,
-            dynamic_data: Cursor::new(dynamic_data),
+            fields,
             header_crc,
 
             current_field_hash: 0,
@@ -253,28 +256,21 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
             });
         }
 
-        let offset = self.data.read_u32::<LittleEndian>().unwrap();
-        self.dynamic_data
-            .seek(SeekFrom::Start(offset as u64))
-            .unwrap();
-        let field_size = self.dynamic_data.read_u32::<LittleEndian>().unwrap();
-        let field_data_crc = self.dynamic_data.read_u32::<LittleEndian>().unwrap();
-        let field_offset = self.dynamic_data.read_u64::<LittleEndian>().unwrap();
-        self.dynamic_data
-            .seek(SeekFrom::Start(field_offset))
-            .unwrap();
-        let mut field_data = vec![0; field_size as usize];
-        self.dynamic_data.read_exact(&mut field_data).unwrap();
-
+        let offset = self.data.read_u32::<LittleEndian>()? as usize;
+        let dynamic_data_header: &DynamicDataHeader = bytemuck::from_bytes(
+            &self.dynamic_data[offset..offset + std::mem::size_of::<DynamicDataHeader>()],
+        );
+        let dynamic_data = &self.dynamic_data[dynamic_data_header.offset as usize
+            ..dynamic_data_header.offset as usize + dynamic_data_header.size as usize];
         {
             let mut digest = CRC32.digest();
-            digest.update(&field_data);
-            if field_data_crc != digest.finalize() {
+            digest.update(dynamic_data);
+            if dynamic_data_header.crc != digest.finalize() {
                 return Err(Error::IntegrityError);
             }
         }
 
-        visitor.visit_string(String::from_utf8(field_data).unwrap())
+        visitor.visit_string(std::str::from_utf8(dynamic_data).unwrap().to_string())
     }
 
     fn deserialize_bytes<V>(self, _visitor: V) -> Result<V::Value>
@@ -368,12 +364,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: serde::de::Visitor<'de>,
     {
         let fields_id = self.data.read_u32::<LittleEndian>().map_err(Error::Io)?;
-        let fields = self
-            .fields
-            .get(fields_id as usize)
-            .unwrap()
-            .clone()
-            .into_iter();
+        let fields = self.fields.get(fields_id as usize).unwrap().iter();
         visitor.visit_map(MapAccess { de: self, fields })
     }
 
@@ -435,7 +426,7 @@ impl<'a, 'de> serde::de::SeqAccess<'de> for SeqAccess<'a, 'de> {
 struct MapAccess<'a, 'de: 'a> {
     de: &'a mut Deserializer<'de>,
 
-    fields: std::vec::IntoIter<Field>,
+    fields: std::slice::Iter<'de, Field>,
 }
 
 impl<'a, 'de> serde::de::MapAccess<'de> for MapAccess<'a, 'de> {

@@ -1,3 +1,5 @@
+use std::io::{Cursor, Read};
+
 use anyhow::{bail, Result};
 use bevy::{
     asset::{AssetLoader, BoxedFuture, LoadContext, LoadedAsset},
@@ -5,7 +7,6 @@ use bevy::{
     render::mesh::{Indices, PrimitiveTopology},
 };
 use byteorder::{LittleEndian, ReadBytesExt};
-use std::io::{Cursor, Read};
 use thiserror::Error;
 
 #[derive(Default)]

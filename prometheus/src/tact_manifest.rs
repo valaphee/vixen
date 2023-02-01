@@ -1,62 +1,49 @@
+use std::io::Read;
+
 use aes::cipher::block_padding::NoPadding;
 use aes::cipher::{BlockDecryptMut, KeyIvInit};
 use anyhow::Result;
+use bytemuck::{Pod, Zeroable};
 use byteorder::{LittleEndian, ReadBytesExt};
 use sha1::{Digest, Sha1};
-use std::io::Read;
 
 #[derive(Debug)]
 pub struct ContentManifest {
-    build_version: u32,
-    unknown_04: u32,
-    unknown_08: u32,
-    unknown_0c: u32,
-    unknown_10: u32,
-    unknown_14: u32,
-    unknown_18: u32,
-    asset_patch_record_count: u32,
-    entry_patch_record_count: u32,
     entries: Vec<ContentManifestEntry>,
     pub assets: Vec<ContentManifestAsset>,
 }
 
 impl ContentManifest {
     pub fn read_from(mut input: &[u8], file_name: String) -> Result<Self> {
-        let build_version = input.read_u32::<LittleEndian>()?;
-        let unknown_04 = input.read_u32::<LittleEndian>()?;
-        let unknown_08 = input.read_u32::<LittleEndian>()?;
-        let unknown_0c = input.read_u32::<LittleEndian>()?;
-        let unknown_10 = input.read_u32::<LittleEndian>()?;
-        let unknown_14 = input.read_u32::<LittleEndian>()?;
-        let unknown_18 = input.read_u32::<LittleEndian>()?;
-        let asset_patch_record_count = input.read_u32::<LittleEndian>()?;
-        let asset_count = input.read_u32::<LittleEndian>()?;
-        let entry_patch_record_count = input.read_u32::<LittleEndian>()?;
-        let entry_count = input.read_u32::<LittleEndian>()?;
+        let header = bytemuck::from_bytes::<ContentManifestHeader>(
+            &input[..std::mem::size_of::<ContentManifestHeader>()],
+        );
+        input = &input[std::mem::size_of::<ContentManifestHeader>()..];
 
         if input.read_u32::<LittleEndian>()? >> 8 /* cmf */ != 0x636D66 {}
         let input = {
-            if build_version != 109168 {}
+            if header.build_version != 109168 {}
             let mut file_name_sha1 = Sha1::new();
             file_name_sha1.update(file_name);
             let file_name_sha1 = file_name_sha1.finalize();
             let key = {
                 let mut buffer = [0u8; 0x20];
-                let mut kidx = buffer.len() as u32 * build_version;
+                let mut kidx = buffer.len() as u32 * header.build_version;
                 let mut okidx = kidx;
                 for i in 0..buffer.len() {
                     buffer[i] = KEYTABLE[(kidx % 0x200) as usize];
-                    kidx = build_version.wrapping_sub(kidx);
+                    kidx = header.build_version.wrapping_sub(kidx);
                 }
                 buffer
             };
             let iv = {
                 let mut buffer = [0u8; 16];
-                let mut kidx = KEYTABLE[(build_version & 0x1FF) as usize] as u32;
+                let mut kidx = KEYTABLE[(header.build_version & 0x1FF) as usize] as u32;
                 let mut okidx = kidx;
                 for i in 0..buffer.len() {
                     buffer[i] = KEYTABLE[(kidx % 0x200) as usize];
-                    kidx = kidx.wrapping_add(build_version.wrapping_mul(asset_count) % 7);
+                    kidx = kidx
+                        .wrapping_add(header.build_version.wrapping_mul(header.asset_count) % 7);
                     buffer[i] ^= file_name_sha1[kidx
                         .wrapping_sub(73)
                         .rem_euclid(file_name_sha1.len() as u32)
@@ -71,28 +58,16 @@ impl ContentManifest {
         };
         let mut input = input.as_slice();
 
-        let mut entries = Vec::with_capacity(entry_count as usize);
-        for _ in 0..entry_count {
+        let mut entries = Vec::with_capacity(header.entry_count as usize);
+        for _ in 0..header.entry_count {
             entries.push(ContentManifestEntry::read_from(&mut input)?);
         }
-        let mut assets = Vec::with_capacity(entry_count as usize);
-        for _ in 0..asset_count {
+        let mut assets = Vec::with_capacity(header.entry_count as usize);
+        for _ in 0..header.asset_count {
             assets.push(ContentManifestAsset::read_from(&mut input)?);
         }
 
-        Ok(ContentManifest {
-            build_version,
-            unknown_04,
-            unknown_08,
-            unknown_0c,
-            unknown_10,
-            unknown_14,
-            unknown_18,
-            asset_patch_record_count,
-            assets,
-            entry_patch_record_count,
-            entries,
-        })
+        Ok(ContentManifest { assets, entries })
     }
 }
 
@@ -318,6 +293,22 @@ impl ResourceGraphSkinAsset {
             unknown_1c: input.read_u32::<LittleEndian>()?,
         })
     }
+}
+
+#[repr(C, packed)]
+#[derive(Copy, Clone, Pod, Zeroable)]
+struct ContentManifestHeader {
+    build_version: u32,
+    u32_0: u32,
+    u32_1: u32,
+    u32_2: u32,
+    u32_3: u32,
+    u32_4: u32,
+    u32_5: u32,
+    asset_patch_record_count: u32,
+    asset_count: u32,
+    entry_patch_record_count: u32,
+    entry_count: u32,
 }
 
 type Aes256CbcEnc = cbc::Encryptor<aes::Aes256>;

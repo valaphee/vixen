@@ -1,13 +1,15 @@
-use anyhow::Result;
-use bevy::asset::{AssetIoError, BoxedFuture, Metadata};
-use csv::ReaderBuilder;
-use prometheus::casc::Casc;
-use prometheus::tact::{BuildInfo, Encoding, RootFile};
-use prometheus::tact_manifest::ContentManifest;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
+
+use anyhow::Result;
+use bevy::asset::{AssetIoError, BoxedFuture, Metadata};
+use csv::ReaderBuilder;
+
+use prometheus::casc::Casc;
+use prometheus::tact::{BuildInfo, Encoding, RootFile};
+use prometheus::tact_manifest::ContentManifest;
 
 pub struct AssetIo {
     storage: Casc,
@@ -34,9 +36,9 @@ impl Default for AssetIo {
                 build_info.build_key[1],
                 hex::encode(build_info.build_key)
             )))
-                .unwrap(),
+            .unwrap(),
         )
-            .lines()
+        .lines()
         {
             let line = line.unwrap();
             if line.trim().is_empty() || line.starts_with('#') {
@@ -60,7 +62,7 @@ impl Default for AssetIo {
                 .unwrap()
                 .as_slice(),
         )
-            .unwrap();
+        .unwrap();
         let mut root_files = HashMap::new();
         {
             for entry in ReaderBuilder::new()
@@ -94,7 +96,7 @@ impl Default for AssetIo {
                     .as_slice(),
                 "TactManifest/Win_SPWin_RCN_EExt.cmf".to_string(),
             )
-                .unwrap();
+            .unwrap();
             for asset in content_manifest.assets {
                 assets.insert(asset.guid, asset.md5);
             }

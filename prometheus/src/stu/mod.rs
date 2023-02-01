@@ -1,10 +1,24 @@
-use byteorder::{LittleEndian, ReadBytesExt};
-use std::io::{Read, Seek, SeekFrom};
+use bytemuck::{Pod, Zeroable};
 
 pub mod de;
 pub mod error;
 
-#[derive(Debug)]
+#[repr(C, packed)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
+struct Header {
+    instance_count: u32,
+    instance_offset: u32,
+    inline_array_count: u32,
+    inline_array_offset: u32,
+    field_set_count: u32,
+    field_set_offset: u32,
+    dynamic_data_size: u32,
+    dynamic_data_offset: u32,
+    data_offset: u32,
+}
+
+#[repr(C, packed)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
 struct Instance {
     hash: u32,
     parent_hash: u32,
@@ -12,63 +26,26 @@ struct Instance {
     size: u32,
 }
 
-impl Instance {
-    fn read_from<R: Read>(input: &mut R) -> std::io::Result<Self> {
-        Ok(Self {
-            hash: input.read_u32::<LittleEndian>()?,
-            parent_hash: input.read_u32::<LittleEndian>()?,
-            unknown8: input.read_u32::<LittleEndian>()?,
-            size: input.read_u32::<LittleEndian>()?,
-        })
-    }
-}
-
-#[derive(Debug)]
+#[repr(C, packed)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
 struct InlineArray {
     type_hash: u32,
     size: u32,
 }
 
-impl InlineArray {
-    fn read_from<R: Read>(input: &mut R) -> std::io::Result<Self> {
-        Ok(Self {
-            type_hash: input.read_u32::<LittleEndian>()?,
-            size: input.read_u32::<LittleEndian>()?,
-        })
-    }
-}
-
-#[derive(Debug, Clone)]
+#[repr(C, packed)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
 struct Field {
     hash: u32,
     size: u32,
 }
 
-impl Field {
-    fn read_from<R: Read>(input: &mut R) -> std::io::Result<Self> {
-        Ok(Self {
-            hash: input.read_u32::<LittleEndian>()?,
-            size: input.read_u32::<LittleEndian>()?,
-        })
-    }
-}
-
-fn read_bag<R: Read + Seek, T, F: Fn(&mut R) -> std::io::Result<T>>(
-    input: &mut R,
-    consume: F,
-) -> std::io::Result<Vec<T>> {
-    let size = input.read_u32::<LittleEndian>()?;
-    let offset = input.read_u32::<LittleEndian>()?;
-
-    let position = input.stream_position()?;
-    let mut value = Vec::with_capacity(size as usize);
-    input.seek(SeekFrom::Start(offset as u64))?;
-    for _ in 0..size {
-        value.push(consume(input)?);
-    }
-    input.seek(SeekFrom::Start(position))?;
-
-    Ok(value)
+#[repr(C, packed)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
+struct DynamicDataHeader {
+    size: u32,
+    crc: u32,
+    offset: u64,
 }
 
 // replace with crc crate

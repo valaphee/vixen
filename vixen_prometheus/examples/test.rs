@@ -1,7 +1,8 @@
 use bevy::prelude::*;
+
 use prometheus::guid::Guid;
-use vixen_prometheus::texture::TeTextureLoader;
 use vixen_prometheus::asset_io::AssetIo;
+use vixen_prometheus::texture::TeTextureLoader;
 
 fn main() {
     App::new()

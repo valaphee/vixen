@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+
 use vixen_obj::ObjLoader;
 
 fn main() {

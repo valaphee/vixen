@@ -1,8 +1,10 @@
+use std::f32::consts::{FRAC_PI_2, PI};
+
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 use bevy::window::CursorGrabMode;
-use std::f32::consts::{FRAC_PI_2, PI};
+
 use vixen_steamaudio::{AudioPlugin, Listener, SoundBundle};
 
 fn main() {

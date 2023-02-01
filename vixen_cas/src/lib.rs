@@ -1,3 +1,5 @@
+use std::path::{Path, PathBuf};
+
 use anyhow::Result;
 use bevy::{
     asset::{AssetIo, AssetIoError, BoxedFuture, Metadata},
@@ -7,7 +9,6 @@ use bevy::{
 use futures_lite::future;
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
-use std::path::{Path, PathBuf};
 
 /// File-based content addressed storage asset io.
 ///

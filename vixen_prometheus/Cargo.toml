@@ -10,6 +10,7 @@ description = "Bevy Prometheus"
 [dependencies]
 anyhow = "1.0"
 bevy = { version = "0.9", default-features = false, features = ["bevy_asset", "bevy_render"] }
+bytemuck = { version = "1.13.0", features = ["derive"] }
 csv = "1.1.6"
 hex = { version = "0.4.3", features = ["serde"] }
 prometheus = { path = "../prometheus" }

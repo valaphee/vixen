@@ -1,9 +1,10 @@
+use std::collections::HashMap;
+use std::io::Read;
+
 use anyhow::{bail, Result};
 use byteorder::{BigEndian, ReadBytesExt};
 use md5::{Digest, Md5};
 use serde::Deserialize;
-use std::collections::HashMap;
-use std::io::Read;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
