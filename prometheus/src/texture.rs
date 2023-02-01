@@ -31,6 +31,7 @@ pub struct TexturePayloadHeader {
 }
 
 bitflags! {
+    #[derive(Debug)]
     pub struct TextureFlags: u16 {
         const D1 = 1 << 0;
         const D2 = 1 << 1;

@@ -13,10 +13,10 @@ pub struct Deserializer<'de> {
     data: &'de [u8],
     dynamic_data: &'de [u8],
 
+    header_crc: u64,
     instances: &'de [Instance],
     inline_arrays: &'de [InlineArray],
     fields: Vec<&'de [Field]>,
-    header_crc: u64,
 
     current_field_hash: u32,
     current_field_size: u32,
@@ -25,6 +25,8 @@ pub struct Deserializer<'de> {
 impl<'de> Deserializer<'de> {
     pub fn from_slice(data: &'de mut [u8]) -> Result<Self> {
         let header: &Header = bytemuck::from_bytes(&data[..std::mem::size_of::<Header>()]);
+        let header_crc = crc64(&data[..std::mem::size_of::<Header>()]);
+
         let instances: &[Instance] = bytemuck::cast_slice(
             &data[header.instance_offset as usize
                 ..header.instance_offset as usize
@@ -47,7 +49,6 @@ impl<'de> Deserializer<'de> {
                 ))
             }
         }
-        let header_crc = crc64(&data[..std::mem::size_of::<Header>()]);
 
         Ok(Self {
             data: &data[header.data_offset as usize..],
@@ -391,9 +392,8 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        let mut field_data = vec![0; self.current_field_size as usize];
-        self.data.read_exact(&mut field_data).unwrap();
-        visitor.visit_byte_buf(field_data)
+        self.data = &self.data[self.current_field_size as usize..];
+        visitor.visit_unit()
     }
 }
 
