@@ -2,13 +2,13 @@ use bevy::prelude::*;
 
 use prometheus::guid::Guid;
 use vixen_prometheus::asset_io::AssetIo;
-use vixen_prometheus::texture::TeTextureLoader;
+use vixen_prometheus::texture::TextureLoader;
 
 fn main() {
     App::new()
         .insert_resource(AssetServer::new(AssetIo::default()))
         .add_plugins(DefaultPlugins)
-        .init_asset_loader::<TeTextureLoader>()
+        .init_asset_loader::<TextureLoader>()
         .add_startup_system(setup)
         .add_system(change_display)
         .run();

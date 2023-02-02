@@ -9,7 +9,9 @@ use csv::ReaderBuilder;
 
 use prometheus::casc::Casc;
 use prometheus::tact::{BuildInfo, Encoding, RootFile};
-use prometheus::tact_manifest::ContentManifest;
+use prometheus::tact_manifest::{
+    decrypt_cmf, ContentManifestAsset, ContentManifestEntry, ContentManifestHeader,
+};
 
 pub struct AssetIo {
     storage: Casc,
@@ -63,43 +65,54 @@ impl Default for AssetIo {
                 .as_slice(),
         )
         .unwrap();
+
         let mut root_files = HashMap::new();
-        {
-            for entry in ReaderBuilder::new()
-                .delimiter(b'|')
-                .from_reader(
-                    storage
-                        .get(
-                            &encoding
-                                .get(&hex::decode(&build_config["root"]).unwrap())
-                                .unwrap(),
-                        )
-                        .unwrap()
-                        .as_slice(),
-                )
-                .deserialize()
-            {
-                let entry: RootFile = entry.unwrap();
-                root_files.insert(entry.file_name, entry.md5);
-            }
-        }
-        let mut assets = HashMap::new();
-        {
-            let content_manifest = ContentManifest::read_from(
+        for entry in ReaderBuilder::new()
+            .delimiter(b'|')
+            .from_reader(
                 storage
                     .get(
                         &encoding
-                            .get(&root_files["TactManifest/Win_SPWin_RCN_EExt.cmf"])
+                            .get(&hex::decode(&build_config["root"]).unwrap())
                             .unwrap(),
                     )
                     .unwrap()
                     .as_slice(),
-                "TactManifest/Win_SPWin_RCN_EExt.cmf".to_string(),
+            )
+            .deserialize()
+        {
+            let entry: RootFile = entry.unwrap();
+            root_files.insert(entry.file_name, entry.md5);
+        }
+
+        let mut assets = HashMap::new();
+        let content_manifest_data = storage
+            .get(
+                &encoding
+                    .get(&root_files["TactManifest/Win_SPWin_RCN_EExt.cmf"])
+                    .unwrap(),
             )
             .unwrap();
-            for asset in content_manifest.assets {
-                assets.insert(asset.guid, asset.md5);
-            }
+        let (content_manifest_header_data, content_manifest_data) =
+            content_manifest_data.split_at(std::mem::size_of::<ContentManifestHeader>());
+        let content_manifest_header: &ContentManifestHeader =
+            bytemuck::from_bytes(content_manifest_header_data);
+        let content_manifest_data = decrypt_cmf(
+            "TactManifest/Win_SPWin_RCN_EExt.cmf",
+            content_manifest_header,
+            content_manifest_data,
+        )
+        .unwrap();
+        let content_manifest_asset_offset = content_manifest_header.entry_count as usize
+            * std::mem::size_of::<ContentManifestEntry>();
+        let content_manifest_assets: &[ContentManifestAsset] = bytemuck::cast_slice(
+            &content_manifest_data[content_manifest_asset_offset
+                ..content_manifest_asset_offset
+                    + content_manifest_header.asset_count as usize
+                        * std::mem::size_of::<ContentManifestAsset>()],
+        );
+        for asset in content_manifest_assets {
+            assets.insert(asset.guid, asset.md5);
         }
 
         Self {

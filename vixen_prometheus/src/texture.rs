@@ -9,9 +9,9 @@ use prometheus::guid::Guid;
 use prometheus::texture::{TextureFlags, TextureHeader, TexturePayloadHeader};
 
 #[derive(Default)]
-pub struct TeTextureLoader;
+pub struct TextureLoader;
 
-impl AssetLoader for TeTextureLoader {
+impl AssetLoader for TextureLoader {
     fn load<'a>(
         &'a self,
         bytes: &'a [u8],
@@ -29,8 +29,8 @@ async fn load_texture<'a, 'b>(
     bytes: &'a [u8],
     load_context: &'a mut LoadContext<'b>,
 ) -> Result<()> {
-    let (header_bytes, data_) = bytes.split_at(std::mem::size_of::<TextureHeader>());
-    let header: &TextureHeader = bytemuck::from_bytes(header_bytes);
+    let (header_data, data) = bytes.split_at(std::mem::size_of::<TextureHeader>());
+    let header: &TextureHeader = bytemuck::from_bytes(header_data);
 
     let mut image = Image::default();
     image.texture_descriptor.size = Extent3d {
@@ -54,6 +54,7 @@ async fn load_texture<'a, 'b>(
     };
 
     image.texture_descriptor.format = match header.format {
+        2 => TextureFormat::Rgba32Float,
         10 => TextureFormat::Rgba16Float,
         29 => TextureFormat::Rgba8UnormSrgb,
         30 => TextureFormat::Rgba8UnormSrgb,
@@ -67,7 +68,7 @@ async fn load_texture<'a, 'b>(
         _ => todo!(),
     };
 
-    let mut data = Vec::with_capacity(header.size as usize);
+    let mut image_data = Vec::with_capacity(header.size as usize);
     if header.payload_count != 0 {
         let mut guid = Guid::from(
             load_context
@@ -79,27 +80,27 @@ async fn load_texture<'a, 'b>(
                 .parse::<u64>()
                 .unwrap(),
         );
-        for payload_id in (1..header.payload_count).rev() {
-            guid.type_ = 0x04D;
-            guid.locale = payload_id;
+        guid.type_ = 0x04D;
+        for i in (1..header.payload_count).rev() {
+            guid.locale = i;
 
-            let payload_bytes = load_context
+            let payload_data = load_context
                 .read_asset_bytes(PathBuf::from(guid.to_raw().to_string()))
                 .await?;
-            let (payload_header_bytes, payload_data) =
-                payload_bytes.split_at(std::mem::size_of::<TexturePayloadHeader>());
-            let payload_header: &TexturePayloadHeader = bytemuck::from_bytes(payload_header_bytes);
-            data.extend_from_slice(&payload_data[..payload_header.size as usize])
+            let (payload_header_data, payload_data) =
+                payload_data.split_at(std::mem::size_of::<TexturePayloadHeader>());
+            let payload_header: &TexturePayloadHeader = bytemuck::from_bytes(payload_header_data);
+            image_data.extend_from_slice(&payload_data[..payload_header.size as usize]);
         }
 
         let (payload_header_bytes, payload_data) =
-            data_.split_at(std::mem::size_of::<TexturePayloadHeader>());
+            data.split_at(std::mem::size_of::<TexturePayloadHeader>());
         let payload_header: &TexturePayloadHeader = bytemuck::from_bytes(payload_header_bytes);
-        data.extend_from_slice(&payload_data[..payload_header.size as usize])
+        image_data.extend_from_slice(&payload_data[..payload_header.size as usize]);
     } else {
-        data.extend_from_slice(&data_[..header.size as usize])
+        image_data.extend_from_slice(&data[..header.size as usize]);
     }
-    image.data = data;
+    image.data = image_data;
 
     load_context.set_default_asset(LoadedAsset::new(image));
 

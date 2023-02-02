@@ -1,5 +1,3 @@
-use std::io::Read;
-
 use byteorder::{LittleEndian, ReadBytesExt};
 use crc::Crc;
 

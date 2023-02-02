@@ -17,7 +17,7 @@ pub struct TextureHeader {
     pub u16_0: u16,
     pub u16_1: u16, // always 0, padding?
     pub u32_0: u32, // always 0, padding?
-    pub u64_0: u32, // always 0, padding?
+    pub u64_0: u64, // always 0, padding?
 }
 
 #[repr(C, packed)]
@@ -35,7 +35,7 @@ pub enum TextureUsage {
     None,
     Terrain,
     Map,
-    Unknown3,
+    Tree,
     Hero,
     OverlayEffect,
     Effect,
@@ -47,13 +47,14 @@ pub enum TextureUsage {
     Unknown12,
     Unknown13,
     Unknown14,
-    Sticker
+    Sticker,
+    Unknown16,
 }
 
 unsafe impl Contiguous for TextureUsage {
     type Int = u8;
     const MAX_VALUE: Self::Int = TextureUsage::None as u8;
-    const MIN_VALUE: Self::Int = TextureUsage::Sticker as u8;
+    const MIN_VALUE: Self::Int = TextureUsage::Unknown16 as u8;
 }
 
 bitflags! {

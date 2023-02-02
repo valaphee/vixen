@@ -8,8 +8,12 @@ use csv::ReaderBuilder;
 use serde::Deserialize;
 
 use prometheus::casc::Casc;
+use prometheus::guid::Guid;
+use prometheus::stu::de::Deserializer;
 use prometheus::tact::{BuildInfo, Encoding, RootFile};
-use prometheus::tact_manifest::ContentManifest;
+use prometheus::tact_manifest::{
+    decrypt_cmf, ContentManifestAsset, ContentManifestEntry, ContentManifestHeader,
+};
 
 fn main() -> Result<()> {
     let path = PathBuf::from("/drive_c/Program Files (x86)/Overwatch");
@@ -73,24 +77,54 @@ fn main() -> Result<()> {
             root_files.insert(entry.file_name, entry.md5);
         }
     }
+
     let mut assets = HashMap::new();
-    {
-        let content_manifest = ContentManifest::read_from(
-            storage
-                .get(
-                    &encoding
-                        .get(&root_files["TactManifest/Win_SPWin_RCN_EExt.cmf"])
-                        .unwrap(),
-                )
-                .unwrap()
-                .as_slice(),
-            "TactManifest/Win_SPWin_RCN_EExt.cmf".to_string(),
+    let content_manifest_data = storage
+        .get(
+            &encoding
+                .get(&root_files["TactManifest/Win_SPWin_RCN_EExt.cmf"])
+                .unwrap(),
         )
         .unwrap();
-        for asset in content_manifest.assets {
-            assets.insert(asset.guid, asset.md5);
+    let (content_manifest_header_data, content_manifest_data) =
+        content_manifest_data.split_at(std::mem::size_of::<ContentManifestHeader>());
+    let content_manifest_header: &ContentManifestHeader =
+        bytemuck::from_bytes(content_manifest_header_data);
+    let content_manifest_data = decrypt_cmf(
+        "TactManifest/Win_SPWin_RCN_EExt.cmf",
+        content_manifest_header,
+        content_manifest_data,
+    )
+    .unwrap();
+    let content_manifest_asset_offset =
+        content_manifest_header.entry_count as usize * std::mem::size_of::<ContentManifestEntry>();
+    let content_manifest_assets: &[ContentManifestAsset] = bytemuck::cast_slice(
+        &content_manifest_data[content_manifest_asset_offset
+            ..content_manifest_asset_offset
+                + content_manifest_header.asset_count as usize
+                    * std::mem::size_of::<ContentManifestAsset>()],
+    );
+    for asset in content_manifest_assets {
+        assets.insert(asset.guid, asset.md5);
+    }
+
+    for (guid, md5) in assets {
+        let guid = Guid::from(guid);
+        if guid.type_ == 0x09F {
+            if let Some(e_key) = encoding.get(&md5) {
+                let mut data = storage.get(&e_key)?;
+                let mut deserializer = Deserializer::from_slice(&mut data)?;
+                let map_header = MapHeader::deserialize(&mut deserializer)?;
+                println!("{:?}", map_header);
+            }
         }
     }
 
     Ok(())
+}
+
+#[derive(Deserialize, Debug)]
+struct MapHeader {
+    #[serde(rename = "506FA8D8")]
+    map_name: String,
 }
