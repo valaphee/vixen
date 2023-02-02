@@ -79,7 +79,7 @@ pub fn decrypt_trg(
     header: &ResourceGraphHeader,
     mut data: &[u8],
 ) -> Result<Vec<u8>> {
-    if data.read_u32::<LittleEndian>()? >> 8 /* cmf */ != 0x636D66 {}
+    if data.read_u32::<LittleEndian>()? >> 8 /* trg */ != 0x747267 {}
 
     let mut file_name_sha1 = Sha1::new();
     file_name_sha1.update(file_name);

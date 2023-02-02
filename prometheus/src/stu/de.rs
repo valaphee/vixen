@@ -18,6 +18,7 @@ pub struct Deserializer<'de> {
 
     current_field_hash: u32,
     current_field_size: u32,
+    dynamic_data_slice: Option<&'de [u8]>,
 }
 
 impl<'de> Deserializer<'de> {
@@ -60,6 +61,7 @@ impl<'de> Deserializer<'de> {
 
             current_field_hash: 0,
             current_field_size: 0,
+            dynamic_data_slice: None
         })
     }
 }
@@ -85,113 +87,146 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        if self.current_field_size != 1 {
-            return Err(Error::InvalidLength {
-                length: self.current_field_size,
-                expected: 1,
-            });
-        }
+        visitor.visit_i8(if let Some(dynamic_data_slice) = &mut self.dynamic_data_slice {
+            dynamic_data_slice.read_i8()
+        } else {
+            if self.current_field_size != 1 {
+                return Err(Error::InvalidLength {
+                    length: self.current_field_size,
+                    expected: 1,
+                });
+            }
 
-        visitor.visit_i8(self.data.read_i8().map_err(Error::Io)?)
+            self.data.read_i8()
+        }?)
     }
 
     fn deserialize_i16<V>(self, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
-        if self.current_field_size != 2 {
-            return Err(Error::InvalidLength {
-                length: self.current_field_size,
-                expected: 2,
-            });
-        }
+        visitor.visit_i16(if let Some(dynamic_data_slice) = &mut self.dynamic_data_slice {
+            dynamic_data_slice.read_i16::<LittleEndian>()
+        } else {
+            if self.current_field_size != 2 {
+                return Err(Error::InvalidLength {
+                    length: self.current_field_size,
+                    expected: 2,
+                });
+            }
 
-        visitor.visit_i16(self.data.read_i16::<LittleEndian>().map_err(Error::Io)?)
+            self.data.read_i16::<LittleEndian>()
+        }?)
     }
 
     fn deserialize_i32<V>(self, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
-        if self.current_field_size != 4 {
-            return Err(Error::InvalidLength {
-                length: self.current_field_size,
-                expected: 4,
-            });
-        }
+        visitor.visit_i32(if let Some(dynamic_data_slice) = &mut self.dynamic_data_slice {
+            dynamic_data_slice.read_i32::<LittleEndian>()
+        } else {
+            if self.current_field_size != 4 {
+                return Err(Error::InvalidLength {
+                    length: self.current_field_size,
+                    expected: 4,
+                });
+            }
 
-        visitor.visit_i32(self.data.read_i32::<LittleEndian>().map_err(Error::Io)?)
+            self.data.read_i32::<LittleEndian>()
+        }?)
     }
 
     fn deserialize_i64<V>(self, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
-        if self.current_field_size != 8 {
-            return Err(Error::InvalidLength {
-                length: self.current_field_size,
-                expected: 8,
-            });
-        }
+        visitor.visit_i64(if let Some(dynamic_data_slice) = &mut self.dynamic_data_slice {
+            dynamic_data_slice.read_i64::<LittleEndian>()
+        } else {
+            if self.current_field_size != 8 {
+                return Err(Error::InvalidLength {
+                    length: self.current_field_size,
+                    expected: 8,
+                });
+            }
 
-        visitor.visit_i64(self.data.read_i64::<LittleEndian>().map_err(Error::Io)?)
+            self.data.read_i64::<LittleEndian>()
+        }?)
     }
 
     fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
-        if self.current_field_size != 1 {
-            return Err(Error::InvalidLength {
-                length: self.current_field_size,
-                expected: 1,
-            });
-        }
+        visitor.visit_u8(if let Some(dynamic_data_slice) = &mut self.dynamic_data_slice {
+            dynamic_data_slice.read_u8()
+        } else {
+            if self.current_field_size != 1 {
+                return Err(Error::InvalidLength {
+                    length: self.current_field_size,
+                    expected: 1,
+                });
+            }
 
-        visitor.visit_u8(self.data.read_u8().map_err(Error::Io)?)
+            self.data.read_u8()
+        }?)
     }
 
     fn deserialize_u16<V>(self, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
-        if self.current_field_size != 2 {
-            return Err(Error::InvalidLength {
-                length: self.current_field_size,
-                expected: 2,
-            });
-        }
+        visitor.visit_u16(if let Some(dynamic_data_slice) = &mut self.dynamic_data_slice {
+            dynamic_data_slice.read_u16::<LittleEndian>()
+        } else {
+            if self.current_field_size != 2 {
+                return Err(Error::InvalidLength {
+                    length: self.current_field_size,
+                    expected: 2,
+                });
+            }
 
-        visitor.visit_u16(self.data.read_u16::<LittleEndian>().map_err(Error::Io)?)
+            self.data.read_u16::<LittleEndian>()
+        }?)
     }
 
     fn deserialize_u32<V>(self, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
-        if self.current_field_size != 4 {
-            return Err(Error::InvalidLength {
-                length: self.current_field_size,
-                expected: 4,
-            });
-        }
+        visitor.visit_u32(if let Some(dynamic_data_slice) = &mut self.dynamic_data_slice {
+            dynamic_data_slice.read_u32::<LittleEndian>()
+        } else {
+            if self.current_field_size != 4 {
+                return Err(Error::InvalidLength {
+                    length: self.current_field_size,
+                    expected: 4,
+                });
+            }
 
-        visitor.visit_u32(self.data.read_u32::<LittleEndian>().map_err(Error::Io)?)
+            self.data.read_u32::<LittleEndian>()
+        }?)
     }
 
     fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
-        if self.current_field_size != 8 {
-            return Err(Error::InvalidLength {
-                length: self.current_field_size,
-                expected: 8,
-            });
-        }
+        let mut value = if let Some(dynamic_data_slice) = &mut self.dynamic_data_slice {
+            dynamic_data_slice.read_u64::<LittleEndian>()
+        } else {
+            if self.current_field_size != 8 {
+                return Err(Error::InvalidLength {
+                    length: self.current_field_size,
+                    expected: 8,
+                });
+            }
+
+            self.data.read_u64::<LittleEndian>()
+        }?;
 
         // likely to be an obfuscated GUID
-        let mut value = self.data.read_u64::<LittleEndian>().map_err(Error::Io)?;
         value ^= (self.current_field_hash as u64 | ((self.current_field_hash as u64) << 32))
             ^ self.header_crc;
         let mut bytes = value.to_le_bytes();
@@ -206,28 +241,36 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        if self.current_field_size != 4 {
-            return Err(Error::InvalidLength {
-                length: self.current_field_size,
-                expected: 4,
-            });
-        }
+        visitor.visit_f32(if let Some(dynamic_data_slice) = &mut self.dynamic_data_slice {
+            dynamic_data_slice.read_f32::<LittleEndian>()
+        } else {
+            if self.current_field_size != 4 {
+                return Err(Error::InvalidLength {
+                    length: self.current_field_size,
+                    expected: 4,
+                });
+            }
 
-        visitor.visit_f32(self.data.read_f32::<LittleEndian>().map_err(Error::Io)?)
+            self.data.read_f32::<LittleEndian>()
+        }?)
     }
 
     fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
-        if self.current_field_size != 8 {
-            return Err(Error::InvalidLength {
-                length: self.current_field_size,
-                expected: 8,
-            });
-        }
+        visitor.visit_f64(if let Some(dynamic_data_slice) = &mut self.dynamic_data_slice {
+            dynamic_data_slice.read_f64::<LittleEndian>()
+        } else {
+            if self.current_field_size != 8 {
+                return Err(Error::InvalidLength {
+                    length: self.current_field_size,
+                    expected: 8,
+                });
+            }
 
-        visitor.visit_f64(self.data.read_f64::<LittleEndian>().map_err(Error::Io)?)
+            self.data.read_f64::<LittleEndian>()
+        }?)
     }
 
     fn deserialize_char<V>(self, _visitor: V) -> Result<V::Value>
@@ -237,11 +280,31 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
         unimplemented!()
     }
 
-    fn deserialize_str<V>(self, _visitor: V) -> Result<V::Value>
+    fn deserialize_str<V>(self, visitor: V) -> Result<V::Value>
     where
         V: serde::de::Visitor<'de>,
     {
-        unimplemented!()
+        if self.current_field_size != 4 {
+            return Err(Error::InvalidLength {
+                length: self.current_field_size,
+                expected: 4,
+            });
+        }
+
+        let offset = self.data.read_u32::<LittleEndian>()? as usize;
+        let dynamic_data_header: &DynamicDataHeader = bytemuck::from_bytes(
+            &self.dynamic_data[offset..offset + std::mem::size_of::<DynamicDataHeader>()],
+        );
+        let dynamic_data = &self.dynamic_data[dynamic_data_header.offset as usize
+            ..dynamic_data_header.offset as usize + dynamic_data_header.size as usize];
+
+        let mut digest = CRC32.digest();
+        digest.update(dynamic_data);
+        if dynamic_data_header.crc != digest.finalize() {
+            return Err(Error::IntegrityError);
+        }
+
+        visitor.visit_str(std::str::from_utf8(dynamic_data).unwrap())
     }
 
     fn deserialize_string<V>(self, visitor: V) -> Result<V::Value>
@@ -261,12 +324,11 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
         );
         let dynamic_data = &self.dynamic_data[dynamic_data_header.offset as usize
             ..dynamic_data_header.offset as usize + dynamic_data_header.size as usize];
-        {
-            let mut digest = CRC32.digest();
-            digest.update(dynamic_data);
-            if dynamic_data_header.crc != digest.finalize() {
-                return Err(Error::IntegrityError);
-            }
+
+        let mut digest = CRC32.digest();
+        digest.update(dynamic_data);
+        if dynamic_data_header.crc != digest.finalize() {
+            return Err(Error::IntegrityError);
         }
 
         visitor.visit_string(std::str::from_utf8(dynamic_data).unwrap().to_string())
@@ -319,11 +381,28 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        let field_size = self.data.read_u32::<LittleEndian>().unwrap();
+        let count = if self.current_field_size != 4 {
+            self.data.read_u32::<LittleEndian>()?
+        } else {
+            let offset = self.data.read_u32::<LittleEndian>()? as usize;
+            let dynamic_data_header: &DynamicDataHeader = bytemuck::from_bytes(
+                &self.dynamic_data[offset..offset + std::mem::size_of::<DynamicDataHeader>()],
+            );
+            self.dynamic_data_slice = Some(&self.dynamic_data[dynamic_data_header.offset as usize..]);
+
+            let mut digest = CRC32.digest();
+            digest.update(self.dynamic_data_slice.unwrap());
+            /*if dynamic_data_header.crc != digest.finalize() {
+                return Err(Error::IntegrityError);
+            }*/
+
+            dynamic_data_header.size
+        };
+
         visitor.visit_seq(SeqAccess {
             de: self,
 
-            field_size,
+            count,
         })
     }
 
@@ -362,7 +441,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        let fields_id = self.data.read_u32::<LittleEndian>().map_err(Error::Io)?;
+        let fields_id = self.data.read_u32::<LittleEndian>()?;
         let fields = self.fields.get(fields_id as usize).unwrap().iter();
         visitor.visit_map(MapAccess { de: self, fields })
     }
@@ -398,7 +477,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
 struct SeqAccess<'a, 'de: 'a> {
     de: &'a mut Deserializer<'de>,
 
-    field_size: u32,
+    count: u32,
 }
 
 impl<'a, 'de> serde::de::SeqAccess<'de> for SeqAccess<'a, 'de> {
@@ -408,16 +487,18 @@ impl<'a, 'de> serde::de::SeqAccess<'de> for SeqAccess<'a, 'de> {
     where
         T: serde::de::DeserializeSeed<'de>,
     {
-        if self.field_size == 0 {
+        if self.count == 0 {
+            self.de.dynamic_data_slice = None;
+
             return Ok(None);
         }
-        self.field_size -= 1;
+        self.count -= 1;
 
         seed.deserialize(&mut *self.de).map(Some)
     }
 
     fn size_hint(&self) -> Option<usize> {
-        Some(self.field_size as usize)
+        Some(self.count as usize)
     }
 }
 
@@ -439,7 +520,7 @@ impl<'a, 'de> serde::de::MapAccess<'de> for MapAccess<'a, 'de> {
             self.de.current_field_size = field.size;
             if self.de.current_field_size == 0 {
                 self.de.current_field_size =
-                    self.de.data.read_u32::<LittleEndian>().map_err(Error::Io)?;
+                    self.de.data.read_u32::<LittleEndian>()?;
             }
 
             seed.deserialize(&mut *self.de).map(Some)

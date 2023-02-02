@@ -9,6 +9,7 @@ use serde::Deserialize;
 
 use prometheus::casc::Casc;
 use prometheus::guid::Guid;
+use prometheus::map::MapHeader;
 use prometheus::stu::de::Deserializer;
 use prometheus::tact::{BuildInfo, Encoding, RootFile};
 use prometheus::tact_manifest::{
@@ -82,7 +83,7 @@ fn main() -> Result<()> {
     let content_manifest_data = storage
         .get(
             &encoding
-                .get(&root_files["TactManifest/Win_SPWin_RCN_EExt.cmf"])
+                .get(&root_files["TactManifest/Win_SPWin_RDEV_EExt.cmf"])
                 .unwrap(),
         )
         .unwrap();
@@ -107,6 +108,7 @@ fn main() -> Result<()> {
     for asset in content_manifest_assets {
         assets.insert(asset.guid, asset.md5);
     }
+    println!("{}", assets.len());
 
     for (guid, md5) in assets {
         let guid = Guid::from(guid);
@@ -121,10 +123,4 @@ fn main() -> Result<()> {
     }
 
     Ok(())
-}
-
-#[derive(Deserialize, Debug)]
-struct MapHeader {
-    #[serde(rename = "506FA8D8")]
-    map_name: String,
 }

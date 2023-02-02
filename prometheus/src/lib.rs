@@ -1,6 +1,7 @@
 pub mod blte;
 pub mod casc;
 pub mod guid;
+pub mod map;
 pub mod model;
 pub mod stu;
 pub mod tact;
