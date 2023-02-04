@@ -1,16 +1,13 @@
 [workspace]
 members = [
-    "prometheus",
-
     "vixen_cas",
     "vixen_obj",
-    "vixen_steamaudio",
+    #"vixen_steamaudio",
 
     "vixen_bis_asset",
-    "vixen_prometheus"
 ]
 resolver = "2"
 
 [patch.crates-io]
 bevy = { version = "0.9", path = "../bevy" }
-steamaudio = { path = "../steamaudio" }
+#steamaudio = { path = "../steamaudio" }
